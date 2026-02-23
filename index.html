@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title id="pageTitle">CardX - MultiPlayer</title>
+    <title id="pageTitle">CardX - Professional Edition</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -23,20 +23,20 @@
         const db = getFirestore(app);
         const auth = getAuth(app);
         
-        let playerRole = null; // 1, 2, 3, 4 or 'viewer'
+        let playerRole = null; 
         let currentUser = null;
         let lastLoadedImage = null; 
         const roomId = "global_stable_multi_v1";
 
         const translations = {
             en: {
-                title: "CARD<span class='text-indigo-500 animate-pulse'>X</span> MULTI",
-                setupDesc: "Select your role in the arena",
+                title: "CARD<span class='text-indigo-500 animate-pulse'>X</span> ULTRA",
+                setupDesc: "The Ultimate Multi-Player Arena",
                 p1: "Player 1", p2: "Player 2", p3: "Player 3", p4: "Player 4",
-                viewer: "Watch Match 👀", occupied: "(Busy)",
+                viewer: "Spectator 👀", occupied: "(Busy)",
                 myCard: "Your Secret Card", placeholderCard: "Word or Image...",
                 save: "Save", opCard: "Player",
-                peekHint: "Click to reveal your secret", chatTitle: "💬 Clues & Chat",
+                peekHint: "Click to reveal your secret", chatTitle: "💬 Live Clues",
                 chatPlaceholder: "Type your guess...", send: "Send",
                 reveal: "Reveal All 🏁", waiting: "Empty Slot",
                 empty: "Empty", you: "You", opponent: "Player",
@@ -44,16 +44,16 @@
                 reset: "Restart Match 🔄", resetRoom: "Reset Lobby",
                 showToOpponent: "Show Card 👀", hideFromOpponent: "Hide Card 🔒",
                 isImage: "Picked an Image 📷", isWord: "Picked a Word 📝",
-                viewerMode: "Spectator Mode"
+                exit: "Exit Game 🚪"
             },
             ar: {
-                title: "كارد<span class='text-indigo-500 animate-pulse'>X</span> متعدد",
-                setupDesc: "اختر دورك في الساحة",
+                title: "كارد<span class='text-indigo-500 animate-pulse'>X</span> الترا",
+                setupDesc: "ساحة اللعب الجماعي الأقوى",
                 p1: "اللاعب 1", p2: "اللاعب 2", p3: "اللاعب 3", p4: "اللاعب 4",
                 viewer: "مشاهدة المباراة 👀", occupied: "(مشغول)",
                 myCard: "كارتك السري", placeholderCard: "كلمة أو صورة...",
                 save: "حفظ", opCard: "لاعب",
-                peekHint: "اضغط لرؤية سرك الخاص", chatTitle: "💬 تلميحات ودردشة",
+                peekHint: "اضغط لرؤية سرك الخاص", chatTitle: "💬 تلميحات مباشرة",
                 chatPlaceholder: "اكتب تخمينك هنا...", send: "إرسال",
                 reveal: "كشف الكل 🏁", waiting: "مكان فارغ",
                 empty: "فارغ", you: "أنت", opponent: "لاعب",
@@ -61,7 +61,7 @@
                 reset: "إعادة المباراة 🔄", resetRoom: "إعادة ضبط اللوبي",
                 showToOpponent: "إظهار الكارت 👀", hideFromOpponent: "إخفاء الكارت 🔒",
                 isImage: "اختار صورة 📷", isWord: "اختار كلمة 📝",
-                viewerMode: "وضع المشاهدة"
+                exit: "خروج من اللعبة 🚪"
             }
         };
 
@@ -100,8 +100,8 @@
                 const btn = document.getElementById(`p${i}Btn`);
                 const isOccupied = data[`p${i}Id`] && data[`p${i}Id`] !== currentUser?.uid;
                 btn.disabled = isOccupied;
-                btn.className = isOccupied ? "opacity-30 cursor-not-allowed bg-slate-800 p-6 rounded-2xl border border-white/5" : `p-6 rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-xl font-black ${i%2==0 ? 'bg-purple-600' : 'bg-indigo-600'}`;
-                btn.innerText = isOccupied ? `${t['p'+i]} ${t.occupied}` : t['p'+i];
+                btn.className = isOccupied ? "opacity-30 cursor-not-allowed bg-slate-800 p-6 rounded-2xl border border-white/5" : `group relative p-6 rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-xl font-black ${i%2==0 ? 'bg-purple-600' : 'bg-indigo-600'}`;
+                btn.innerHTML = isOccupied ? `${t['p'+i]} ${t.occupied}` : `${t['p'+i]} <span class="absolute top-2 right-2 w-2 h-2 bg-green-400 rounded-full animate-ping"></span>`;
             }
         }
 
@@ -115,6 +115,16 @@
             document.getElementById('setupZone').classList.add('hidden');
             document.getElementById('gameZone').classList.remove('hidden');
             if (role === 'viewer') document.getElementById('myCardSection').classList.add('hidden');
+        };
+
+        window.exitGame = async () => {
+            if (playerRole && playerRole !== 'viewer') {
+                const roomRef = doc(db, 'games', roomId);
+                await updateDoc(roomRef, { [`p${playerRole}Id`]: "" });
+            }
+            playerRole = null;
+            document.getElementById('gameZone').classList.add('hidden');
+            document.getElementById('setupZone').classList.remove('hidden');
         };
 
         window.handleFileUpload = (event) => {
@@ -168,17 +178,27 @@
                 if (data.open) document.getElementById('pOwnCard').classList.add('is-flipped');
             }
 
-            // Update All Player Cards
+            // Determine active players (who selected an ID)
+            const activePlayers = [];
+            for(let i=1; i<=4; i++) {
+                if (data[`p${i}Id`]) activePlayers.push(i);
+            }
+
             const grid = document.getElementById('playersGrid');
             grid.innerHTML = '';
-            for(let i=1; i<=4; i++) {
-                if (i === playerRole) continue;
+            
+            // Adjust Grid Columns based on active count
+            const count = activePlayers.filter(id => id !== playerRole).length;
+            grid.className = `lg:col-span-2 grid gap-4 ${count === 1 ? 'grid-cols-1 max-w-sm mx-auto' : count === 2 ? 'grid-cols-2' : 'grid-cols-2 md:grid-cols-3'}`;
+
+            activePlayers.forEach(i => {
+                if (i === playerRole) return;
                 const val = data[`p${i}`];
                 const reveal = data[`p${i}Reveal`] || data.open;
                 const isImg = val && val.startsWith('data:image');
                 
                 const cardHtml = `
-                    <div class="blur-card p-4 rounded-[2rem] flex flex-col items-center">
+                    <div class="blur-card p-4 rounded-[2rem] flex flex-col items-center animate-in fade-in zoom-in duration-500">
                         <span class="text-[9px] font-black text-slate-500 mb-3 uppercase tracking-widest">${t.opCard} ${i}</span>
                         <div class="h-8 flex items-center justify-center mb-4 bg-black/20 w-full rounded-xl">
                              <span class="text-[9px] font-bold ${val ? 'text-green-400 animate-pulse' : 'text-slate-600'}">${val ? (isImg ? t.isImage : t.isWord) : t.waiting}</span>
@@ -194,7 +214,7 @@
                     </div>
                 `;
                 grid.innerHTML += cardHtml;
-            }
+            });
 
             if (data.open) {
                 document.getElementById('resetBtnContainer').classList.remove('hidden');
@@ -206,7 +226,7 @@
 
             const log = document.getElementById('guessLog');
             log.innerHTML = (data.chat || []).slice().reverse().map(msg => `
-                <div class="p-3 rounded-xl mb-2 flex flex-col ${msg.isCorrect ? 'bg-green-500 text-white w-full text-center' : (msg.sender === playerRole ? 'bg-indigo-600/30 ml-auto' : 'bg-white/5 mr-auto')} max-w-[90%] border border-white/5">
+                <div class="p-3 rounded-xl mb-2 flex flex-col ${msg.isCorrect ? 'bg-green-500 text-white w-full text-center' : (msg.sender === playerRole ? 'bg-indigo-600/30 ml-auto' : 'bg-white/5 mr-auto')} max-w-[90%] border border-white/5 animate-in slide-in-from-bottom-2">
                     <span class="text-[8px] font-black opacity-40 uppercase">${msg.sender === 'viewer' ? 'Spectator' : t.opponent + ' ' + msg.sender}</span>
                     <span class="text-xs font-bold">${msg.isCorrect ? t.correctGuess + msg.text : msg.text}</span>
                 </div>
@@ -263,7 +283,7 @@
     </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700;800&family=Noto+Sans+Arabic:wght@400;700;900&display=swap');
-        body { background: #020617; color: white; font-family: 'Plus Jakarta Sans', 'Noto Sans Arabic', sans-serif; background-image: radial-gradient(circle at top right, #1e1b4b, transparent), radial-gradient(circle at bottom left, #0f172a, transparent); }
+        body { background: #020617; color: white; font-family: 'Plus Jakarta Sans', 'Noto Sans Arabic', sans-serif; background-image: radial-gradient(circle at top right, #1e1b4b, transparent), radial-gradient(circle at bottom left, #0f172a, transparent); overflow-x: hidden; }
         .blur-card { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.05); }
         .perspective { perspective: 1000px; }
         .card-inner { transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1); transform-style: preserve-3d; width: 100%; height: 100%; position: relative; }
@@ -273,12 +293,29 @@
         .card-front { background: linear-gradient(135deg, #1e1b4b, #312e81); border: 1px solid rgba(255,255,255,0.1); }
         .custom-scroll::-webkit-scrollbar { width: 4px; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #6366f1; border-radius: 10px; }
+        
+        /* Floating Logo Animation */
+        .logo-card {
+            animation: float 4s ease-in-out infinite;
+            transform-style: preserve-3d;
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0) rotateX(0) rotateY(10deg); }
+            50% { transform: translateY(-20px) rotateX(10deg) rotateY(-10deg); }
+        }
+
+        /* Generic In-Animations */
+        .animate-in { animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
     </style>
 </head>
 <body class="p-4 min-h-screen flex flex-col items-center">
     <div class="w-full max-w-6xl">
-        <header class="flex justify-between items-center mb-8 w-full py-4">
-            <h2 id="siteLogo" class="text-2xl font-black tracking-tighter italic">CARD<span class="text-indigo-500">X</span> MULTI</h2>
+        <header class="flex justify-between items-center mb-4 w-full py-4">
+            <h2 id="siteLogo" class="text-2xl font-black tracking-tighter italic">CARD<span class="text-indigo-500">X</span> ULTRA</h2>
             <div class="flex gap-3">
                 <button onclick="toggleLanguage()" data-t="langBtn" class="bg-white/5 border border-white/10 px-4 py-2 rounded-xl text-[10px] font-black uppercase">العربية</button>
                 <button onclick="forceResetRoom()" data-t="resetRoom" class="text-[10px] text-red-400/30 hover:text-red-400 uppercase font-black">Reset Lobby</button>
@@ -286,23 +323,40 @@
         </header>
 
         <!-- Setup Screen -->
-        <div id="setupZone" class="blur-card p-10 md:p-16 rounded-[3rem] text-center shadow-2xl transition-all">
-            <h1 data-t="title" class="text-4xl md:text-6xl font-black mb-4">CARD<span class="text-indigo-500">X</span> MULTI</h1>
-            <p data-t="setupDesc" class="text-slate-400 mb-10 text-sm">Select your role in the arena</p>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto mb-8">
-                <button id="p1Btn" onclick="setupGame(1)" data-t="p1">Player 1</button>
-                <button id="p2Btn" onclick="setupGame(2)" data-t="p2">Player 2</button>
-                <button id="p3Btn" onclick="setupGame(3)" data-t="p3">Player 3</button>
-                <button id="p4Btn" onclick="setupGame(4)" data-t="p4">Player 4</button>
+        <div id="setupZone" class="flex flex-col items-center">
+            <!-- Animated Logo -->
+            <div class="perspective mb-12 mt-6">
+                <div class="logo-card w-32 h-44 bg-gradient-to-br from-indigo-500 to-purple-700 rounded-3xl shadow-[0_20px_50px_rgba(79,70,229,0.3)] flex items-center justify-center border border-white/20">
+                    <span class="text-6xl">🃏</span>
+                </div>
             </div>
-            <button onclick="setupGame('viewer')" data-t="viewer" class="w-full max-w-md bg-slate-800 p-5 rounded-2xl font-black text-slate-300 hover:bg-slate-700 transition-all border border-white/5">Watch Match 👀</button>
+
+            <div class="blur-card p-10 md:p-16 rounded-[3rem] text-center shadow-2xl w-full max-w-4xl border-t border-white/10 animate-in">
+                <h1 data-t="title" class="text-5xl md:text-7xl font-black mb-4">CARD<span class="text-indigo-500">X</span> ULTRA</h1>
+                <p data-t="setupDesc" class="text-slate-400 mb-10 text-sm font-bold tracking-widest uppercase">The Ultimate Multi-Player Arena</p>
+                
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                    <button id="p1Btn" onclick="setupGame(1)" data-t="p1" class="p-6 rounded-2xl bg-indigo-600 font-black">Player 1</button>
+                    <button id="p2Btn" onclick="setupGame(2)" data-t="p2" class="p-6 rounded-2xl bg-purple-600 font-black">Player 2</button>
+                    <button id="p3Btn" onclick="setupGame(3)" data-t="p3" class="p-6 rounded-2xl bg-indigo-600 font-black">Player 3</button>
+                    <button id="p4Btn" onclick="setupGame(4)" data-t="p4" class="p-6 rounded-2xl bg-purple-600 font-black">Player 4</button>
+                </div>
+                
+                <button onclick="setupGame('viewer')" data-t="viewer" class="w-full bg-slate-800/50 p-5 rounded-2xl font-black text-slate-300 hover:bg-slate-700 transition-all border border-white/5">Watch Match 👀</button>
+            </div>
         </div>
 
         <!-- Game Screen -->
-        <div id="gameZone" class="hidden space-y-6">
+        <div id="gameZone" class="hidden space-y-6 animate-in">
+            <!-- Top Controls -->
+            <div class="flex justify-between items-center">
+                <button onclick="exitGame()" data-t="exit" class="bg-red-500/10 text-red-400 text-[10px] px-6 py-3 rounded-2xl border border-red-500/20 font-black uppercase hover:bg-red-500/20 transition-all">Exit Game 🚪</button>
+                <div class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Live Session Active</div>
+            </div>
+
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <!-- My Section -->
-                <div id="myCardSection" class="blur-card p-6 rounded-[2.5rem]">
+                <div id="myCardSection" class="blur-card p-6 rounded-[2.5rem] border-l-4 border-indigo-500">
                     <div class="flex justify-between items-center mb-6">
                         <h3 data-t="myCard" class="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Your Secret</h3>
                         <button id="toggleRevealBtn" onclick="toggleMyCardReveal()" data-t="showToOpponent" class="bg-indigo-500/10 text-indigo-400 text-[9px] px-4 py-2 rounded-xl border border-indigo-500/20 font-black uppercase">Show 👀</button>
@@ -315,14 +369,14 @@
                     </div>
                     <div class="perspective h-64 w-44 mx-auto">
                         <div id="pOwnCard" class="card-inner cursor-pointer" onclick="this.classList.toggle('is-flipped')">
-                            <div class="card-face card-front text-4xl shadow-inner">🔒</div>
+                            <div class="card-face card-front text-4xl shadow-inner border-2 border-indigo-500/20">🔒</div>
                             <div id="myCardContent" class="card-face card-back overflow-hidden"></div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Opponents Grid -->
-                <div id="playersGrid" class="lg:col-span-2 grid grid-cols-2 md:grid-cols-3 gap-4">
+                <!-- Opponents Grid (Size changes dynamically) -->
+                <div id="playersGrid" class="lg:col-span-2 grid gap-4 transition-all duration-700">
                     <!-- Dynamic Content -->
                 </div>
             </div>
