@@ -26,7 +26,7 @@
         let playerRole = null; 
         let currentUser = null;
         let lastLoadedValue = null; 
-        const roomId = "stable_v5_global"; // Version update for clean state
+        const roomId = "stable_v5_global"; 
 
         const translations = {
             en: {
@@ -63,7 +63,7 @@
             }
         };
 
-        let currentLang = 'en'; // Default language is English
+        let currentLang = 'en';
 
         window.toggleLanguage = () => {
             currentLang = currentLang === 'ar' ? 'en' : 'ar';
@@ -96,45 +96,67 @@
             const btn2 = document.getElementById('p2Btn');
             const p1Occupied = data.p1Id && data.p1Id !== currentUser?.uid;
             const p2Occupied = data.p2Id && data.p2Id !== currentUser?.uid;
-
-            btn1.disabled = p1Occupied;
-            btn1.style.opacity = p1Occupied ? "0.5" : "1";
+            btn1.disabled = p1Occupied; btn1.style.opacity = p1Occupied ? "0.5" : "1";
             btn1.innerText = p1Occupied ? `${t.p1} ${t.occupied}` : t.p1;
-            
-            btn2.disabled = p2Occupied;
-            btn2.style.opacity = p2Occupied ? "0.5" : "1";
+            btn2.disabled = p2Occupied; btn2.style.opacity = p2Occupied ? "0.5" : "1";
             btn2.innerText = p2Occupied ? `${t.p2} ${t.occupied}` : t.p2;
         }
 
         window.setupGame = async (role) => {
             if (!currentUser) return;
+            playerRole = role;
+            const roomRef = doc(db, 'games', roomId);
             try {
-                playerRole = role;
-                const roomRef = doc(db, 'games', roomId);
                 await updateDoc(roomRef, { [`p${role}Id`]: currentUser.uid });
-                document.getElementById('setupZone').classList.add('hidden');
-                document.getElementById('gameZone').classList.remove('hidden');
             } catch (e) {
-                await setDoc(doc(db, 'games', roomId), { 
-                    [`p${role}Id`]: currentUser.uid, 
-                    p1: "", p2: "", chat: [], open: false, p1Reveal: false, p2Reveal: false
-                }, { merge: true });
-                document.getElementById('setupZone').classList.add('hidden');
-                document.getElementById('gameZone').classList.remove('hidden');
+                await setDoc(roomRef, { [`p${role}Id`]: currentUser.uid, p1: "", p2: "", chat: [], open: false }, { merge: true });
             }
+            document.getElementById('setupZone').classList.add('hidden');
+            document.getElementById('gameZone').classList.remove('hidden');
         };
 
-        // AUTO SAVE IMAGE FUNCTION
+        // NEW: Function to resize and compress image to avoid Firestore limits
+        async function resizeImage(base64Str) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.src = base64Str;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+                    const max_size = 500; // Resize to max 500px to stay under 1MB limit
+
+                    if (width > height) {
+                        if (width > max_size) {
+                            height *= max_size / width;
+                            width = max_size;
+                        }
+                    } else {
+                        if (height > max_size) {
+                            width *= max_size / height;
+                            height = max_size;
+                        }
+                    }
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    resolve(canvas.toDataURL('image/jpeg', 0.7)); // Compress as JPEG at 70% quality
+                };
+            });
+        }
+
         window.handleFileUpload = (event) => {
             const file = event.target.files[0];
             if (!file) return;
             const reader = new FileReader();
             reader.onload = async (e) => {
-                const imageData = e.target.result;
-                lastLoadedValue = imageData; 
-                renderMyCard(imageData);
-                // Instant update to DB for opponent status
-                await updateDoc(doc(db, 'games', roomId), { [`p${playerRole}`]: imageData });
+                const originalBase64 = e.target.result;
+                // Compress before saving
+                const compressedBase64 = await resizeImage(originalBase64);
+                lastLoadedValue = compressedBase64; 
+                renderMyCard(compressedBase64);
+                await updateDoc(doc(db, 'games', roomId), { [`p${playerRole}`]: compressedBase64 });
             };
             reader.readAsDataURL(file);
         };
@@ -165,14 +187,12 @@
             const myRevealState = playerRole === 1 ? data.p1Reveal : data.p2Reveal;
             const opRevealState = playerRole === 1 ? data.p2Reveal : data.p1Reveal;
 
-            // Use local value if present, else fallback to db
             renderMyCard(lastLoadedValue || myVal);
 
             const opDisplay = document.getElementById('opponentCardContent');
             const opStatus = document.getElementById('opStatusText');
             const opCardEl = document.getElementById('opponentCard');
 
-            // CRITICAL FIX: Direct check for opVal to update status
             if (opVal && opVal.trim() !== "") {
                 const isImg = opVal.startsWith('data:image');
                 opStatus.innerText = isImg ? t.isImage : t.isWord;
@@ -235,10 +255,7 @@
             const snap = await getDoc(roomRef);
             const data = snap.data();
             const opVal = playerRole === 1 ? data.p2 : data.p1;
-            
-            // Check only if it is a word. Images cannot be guessed by text
             const isCorrect = opVal && !opVal.startsWith('data:image') && text.toLowerCase() === opVal.toLowerCase();
-            
             await updateDoc(roomRef, {
                 chat: arrayUnion({ text, sender: playerRole, isCorrect, time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) }),
                 open: isCorrect || data.open
@@ -261,9 +278,7 @@
             else { await signInAnonymously(auth); }
         });
 
-        window.onload = () => {
-            applyTranslations();
-        };
+        window.onload = () => { applyTranslations(); };
     </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');
@@ -286,7 +301,6 @@
             </div>
         </div>
 
-        <!-- Setup Screen -->
         <div id="setupZone" class="bg-slate-900/50 p-12 rounded-[2.5rem] border border-white/5 text-center backdrop-blur-xl shadow-2xl">
             <h1 data-t="title" class="text-4xl font-black mb-6 bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">Guess My Card Online</h1>
             <p data-t="setupDesc" class="text-slate-400 mb-10">Pick your slot to start playing</p>
@@ -296,10 +310,8 @@
             </div>
         </div>
 
-        <!-- Game Interface -->
         <div id="gameZone" class="hidden space-y-8 animate-in fade-in duration-500">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <!-- User Card -->
                 <div class="bg-slate-900/40 p-6 rounded-[2.5rem] border border-white/10 shadow-lg backdrop-blur-sm">
                     <div class="flex justify-between items-center mb-6">
                         <h3 data-t="myCard" class="text-xs font-bold text-indigo-300 uppercase tracking-widest">Your Secret Card</h3>
@@ -320,7 +332,6 @@
                     <p data-t="peekHint" class="text-[10px] text-center mt-6 text-slate-500 uppercase font-black tracking-widest opacity-60">Click to flip your card</p>
                 </div>
 
-                <!-- Opponent Card -->
                 <div class="bg-slate-900/40 p-6 rounded-[2.5rem] border border-white/10 shadow-lg backdrop-blur-sm">
                     <h3 data-t="opCard" class="text-xs font-bold mb-6 text-purple-300 uppercase tracking-widest">Opponent's Card</h3>
                     <div class="h-12 flex items-center justify-center mb-4 bg-black/30 rounded-2xl border border-white/5 px-4 text-center">
@@ -335,7 +346,6 @@
                 </div>
             </div>
 
-            <!-- Chat & Clues -->
             <div class="bg-slate-900/60 p-6 rounded-[3rem] border border-white/10 shadow-2xl">
                 <h3 data-t="chatTitle" class="text-xs font-bold mb-6 text-slate-300 uppercase tracking-widest">💬 Clues & Chat</h3>
                 <div id="guessLog" class="h-56 overflow-y-auto mb-6 p-5 bg-black/40 rounded-[2rem] flex flex-col border border-white/5 gap-2 scroll-smooth"></div>
