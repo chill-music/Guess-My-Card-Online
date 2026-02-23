@@ -10,7 +10,6 @@
         import { getFirestore, doc, onSnapshot, setDoc, updateDoc, arrayUnion, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-        // Firebase Configuration (From your screenshots)
         const firebaseConfig = {
             apiKey: "AIzaSyCnmD9VzAwryverdyflav-PCPyNOT1yvqM",
             authDomain: "gueeswhat-552c5.firebaseapp.com",
@@ -24,7 +23,7 @@
         const db = getFirestore(app);
         const auth = getAuth(app);
         
-        let roomRef = null; // Will be initialized AFTER auth
+        let roomRef = null;
         let playerRole = null; 
         let currentUser = null;
         let currentLang = 'en';
@@ -76,7 +75,8 @@
 
         function applyTranslations() {
             const t = translations[currentLang];
-            document.getElementById('mainHtml').dir = currentLang === 'ar' ? 'rtl' : 'ltr';
+            const htmlTag = document.getElementById('mainHtml');
+            if(htmlTag) htmlTag.dir = currentLang === 'ar' ? 'rtl' : 'ltr';
             document.getElementById('pageTitle').innerText = t.pageTitle;
             document.getElementById('brandLogo').innerHTML = t.brand;
 
@@ -89,6 +89,7 @@
 
         const initRoomListener = () => {
             if (!roomRef) return;
+            // إضافة معالج خطأ صريح (Rule 2 requirement)
             onSnapshot(roomRef, (docSnap) => {
                 if (!docSnap.exists()) {
                     setDoc(roomRef, { p1: "", p2: "", chat: [], open: false, p1Id: "", p2Id: "", p1Reveal: false, p2Reveal: false });
@@ -97,10 +98,23 @@
                 const data = docSnap.data();
                 updateSetupUI(data);
                 if (playerRole) updateGameUI(data);
+                
+                // اخفاء شاشة التحميل بمجرد وصول أول بيانات بنجاح
+                hideLoading();
             }, (error) => {
-                console.error("Snapshot Error:", error);
+                console.error("Firestore Error:", error);
+                // محاولة إعادة التهيئة في حال وجود خطأ في الصلاحيات
+                setTimeout(initRoomListener, 3000);
             });
         };
+
+        function hideLoading() {
+            const overlay = document.getElementById('loadingOverlay');
+            if (overlay) {
+                overlay.style.opacity = '0';
+                setTimeout(() => overlay.classList.add('hidden'), 500);
+            }
+        }
 
         function updateSetupUI(data) {
             const t = translations[currentLang];
@@ -249,7 +263,6 @@
             }
         };
 
-        // AUTHENTICATION FIRST (RULE 3)
         const initAuth = async () => {
             try {
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
@@ -258,7 +271,7 @@
                     await signInAnonymously(auth);
                 }
             } catch (err) {
-                console.error("Auth failed:", err);
+                console.error("Auth failed, retrying...", err);
                 setTimeout(initAuth, 2000);
             }
         };
@@ -266,14 +279,15 @@
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 currentUser = user;
-                // INITIALIZE PATH AFTER AUTH (RULE 1)
+                // تطبيق Rule 1 بدقة متناهية: المسار المعتمد في البيئة
                 const appId = typeof __app_id !== 'undefined' ? __app_id : 'cardx-online-v1';
                 roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'room_main');
                 
-                document.getElementById('loadingOverlay').style.opacity = '0';
-                setTimeout(() => document.getElementById('loadingOverlay').classList.add('hidden'), 500);
-                
+                // بدء الاستماع
                 initRoomListener();
+
+                // حماية أخيرة: إذا لم يتم إخفاء شاشة التحميل بعد 5 ثوانٍ، نقوم بإخفائها يدوياً
+                setTimeout(hideLoading, 5000);
             }
         });
 
