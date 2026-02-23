@@ -3,65 +3,90 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Guess My Card - Elite Edition</title>
+    <title>Guess My Card - Ultra Secure Edition</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getFirestore, doc, onSnapshot, setDoc, updateDoc, arrayUnion, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-        // Firebase Configuration
-        const firebaseConfig = JSON.parse(__firebase_config);
+        /**
+         * SECURITY CONFIGURATION:
+         * We are using Vite/Process env logic. 
+         * For local development, these values come from your .env file.
+         * For GitHub/Production, these come from your Secrets.
+         */
+        const firebaseConfig = {
+            apiKey: import.meta.env?.VITE_FIREBASE_API_KEY || "", 
+            authDomain: import.meta.env?.VITE_FIREBASE_AUTH_DOMAIN || "",
+            projectId: import.meta.env?.VITE_FIREBASE_PROJECT_ID || "",
+            storageBucket: import.meta.env?.VITE_FIREBASE_STORAGE_BUCKET || "",
+            messagingSenderId: import.meta.env?.VITE_FIREBASE_MESSAGING_SENDER_ID || "",
+            appId: import.meta.env?.VITE_FIREBASE_APP_ID || ""
+        };
+
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'guess-my-card-elite';
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         
         let playerRole = null; 
         let currentUser = null;
         let maxPlayers = 2;
-        const roomId = "elite_global_v2"; 
+        const roomId = "global_secure_room"; 
 
         const translations = {
             en: {
-                title: "Elite Guessing",
-                subtitle: "Elite Gaming Experience",
-                setupDesc: "Choose room capacity and your slot to begin",
-                save: "Save", upload: "📷", chatTitle: "💬 Live Feed & Clues",
+                title: "Guess My Card ULTRA",
+                subtitle: "The Ultimate Social Guessing Game",
+                setupDesc: "Choose your position. Your card remains hidden until someone guesses it!",
+                save: "Save", upload: "📷", chatTitle: "💬 Clues & Chat",
                 chatPlaceholder: "Type your guess...", send: "Send",
-                reveal: "Reveal All Cards 🏁", waiting: "Waiting for player...",
+                reveal: "Reveal All Cards 🏁", waiting: "Waiting for card...",
                 empty: "Empty", you: "You", player: "Player",
                 langBtn: "العربية", resetRoom: "Reset Room",
-                showToAll: "Show Card 👀", hideFromAll: "Hide Card 🔒",
                 spectator: "Spectator Mode 👁️",
-                isImage: "Picked an Image 📷", isWord: "Picked a Word 📝",
                 capacity: "Room Capacity:",
-                restart: "Restart Game 🔄",
-                peekHint: "Click your card to reveal/hide",
+                restart: "New Game 🔄",
                 joinedAs: "Joined as:",
-                correctGuess: "🎉 Correct! The answer was: "
+                correctGuess: "🎉 Correct! The answer was: ",
+                ready: "READY", waitingStatus: "WAITING",
+                inputHint: "Enter card text or upload image"
             },
             ar: {
-                title: "تخمين النخبة",
-                subtitle: "تجربة ألعاب فاخرة",
-                setupDesc: "اختر سعة الغرفة ومكانك للبدء",
-                save: "حفظ", upload: "📷", chatTitle: "💬 البث المباشر والتلميحات",
+                title: "تخمين الكارت - الترا",
+                subtitle: "لعبة التخمين الاجتماعية الأمثل",
+                setupDesc: "اختر مكانك. سيظل كارتك مخفياً حتى يتم تخمينه!",
+                save: "حفظ", upload: "📷", chatTitle: "💬 التلميحات والدردشة",
                 chatPlaceholder: "اكتب تخمينك هنا...", send: "إرسال",
-                reveal: "كشف كل الكروت 🏁", waiting: "في انتظار اللاعب...",
+                reveal: "كشف الكل 🏁", waiting: "في انتظار الكارت...",
                 empty: "فارغ", you: "أنت", player: "لاعب",
                 langBtn: "English", resetRoom: "إعادة ضبط",
-                showToAll: "إظهار الكارت 👀", hideFromAll: "إخفاء الكارت 🔒",
                 spectator: "وضع المشاهد 👁️",
-                isImage: "اختار صورة 📷", isWord: "اختار كلمة 📝",
                 capacity: "سعة الغرفة:",
-                restart: "إعادة اللعب 🔄",
-                peekHint: "اضغط على كارتك لرؤيته أو إخفائه",
+                restart: "لعبة جديدة 🔄",
                 joinedAs: "دخلت كـ:",
-                correctGuess: "🎉 صحيح! الإجابة كانت: "
+                correctGuess: "🎉 صحيح! الإجابة كانت: ",
+                ready: "جاهز", waitingStatus: "ينتظر",
+                inputHint: "أدخل نص الكارت أو ارفع صورة"
             }
         };
 
-        let currentLang = 'en';
+        let currentLang = 'en'; // Default language is English
+
+        // Handle Image Upload
+        window.handleImageUpload = (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const base64Image = e.target.result;
+                if (playerRole && playerRole !== 'spectator') {
+                    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', roomId), { [`p${playerRole}`]: base64Image });
+                }
+            };
+            reader.readAsDataURL(file);
+        };
 
         window.toggleLanguage = () => {
             currentLang = currentLang === 'en' ? 'ar' : 'en';
@@ -79,236 +104,143 @@
                 if (el.tagName === 'INPUT') el.placeholder = t[key];
                 else el.innerText = t[key];
             });
-            
-            // Special cases for dynamic content
-            if (currentUser) updateUIStrings();
+            if (currentUser && playerRole) updateGameUIStrings();
         }
 
         const initRoomListener = () => {
             const roomRef = doc(db, 'artifacts', appId, 'public', 'data', roomId);
             onSnapshot(roomRef, (docSnap) => {
                 if (!docSnap.exists()) {
-                    createInitialRoom();
+                    setDoc(roomRef, { maxPlayers: 2, chat: [], open: false });
                     return;
                 }
                 const data = docSnap.data();
                 maxPlayers = data.maxPlayers || 2;
                 updateSetupUI(data);
                 if (playerRole) updateGameUI(data);
-            }, (error) => console.error("Snapshot error:", error));
-        };
-
-        async function createInitialRoom() {
-            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', roomId), { 
-                maxPlayers: 2, 
-                chat: [], 
-                open: false,
-                p1: "", p2: "", p3: "", p4: ""
-            });
-        }
-
-        window.setCapacity = async (num) => {
-            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', roomId);
-            await updateDoc(roomRef, { maxPlayers: num });
+            }, (err) => console.error("Sync Error:", err));
         };
 
         function updateSetupUI(data) {
             const t = translations[currentLang];
             const grid = document.getElementById('playerGrid');
             grid.innerHTML = '';
-            
             for(let i=1; i<=maxPlayers; i++) {
                 const pId = data[`p${i}Id`];
                 const isOccupied = pId && pId !== currentUser?.uid;
                 const isMe = pId === currentUser?.uid;
-                
                 const btn = document.createElement('button');
-                btn.className = `p-5 rounded-2xl font-bold transition-all transform hover:scale-105 shadow-xl flex flex-col items-center justify-center gap-1 ${isMe ? 'bg-green-500 ring-4 ring-white/20' : isOccupied ? 'bg-slate-800 opacity-60 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-500'}`;
-                
-                const roleName = isMe ? t.you : `${t.player} ${i}`;
-                btn.innerHTML = `<span>${roleName}</span><span class="text-[9px] opacity-70">${isOccupied ? 'Occupied' : 'Join'}</span>`;
-                
+                btn.className = `p-6 rounded-2xl font-bold transition-all shadow-xl flex flex-col items-center justify-center ${isMe ? 'bg-green-500 ring-4' : isOccupied ? 'bg-slate-800 opacity-50 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-500'}`;
+                btn.innerHTML = `<span class="text-lg">${isMe ? t.you : t.player + ' ' + i}</span>`;
                 btn.onclick = () => !isOccupied && setupGame(i);
                 grid.appendChild(btn);
             }
-
-            document.getElementById('capacityTitle').innerText = `${t.capacity} ${maxPlayers}`;
+            document.getElementById('capacityText').innerText = `${t.capacity} ${maxPlayers}`;
         }
+
+        window.setCapacity = async (val) => {
+            if (playerRole) return;
+            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', roomId);
+            await updateDoc(roomRef, { maxPlayers: val });
+        };
 
         window.setupGame = async (role) => {
             if (!currentUser) return;
             playerRole = role;
             const roomRef = doc(db, 'artifacts', appId, 'public', 'data', roomId);
-            if (role !== 'spectator') {
-                await updateDoc(roomRef, { [`p${role}Id`]: currentUser.uid });
-            }
-            
-            document.getElementById('setupZone').style.display = 'none';
+            if (role !== 'spectator') await updateDoc(roomRef, { [`p${role}Id`]: currentUser.uid });
+            document.getElementById('setupZone').classList.add('hidden');
             document.getElementById('gameZone').classList.remove('hidden');
-            
-            if (role === 'spectator') {
-                document.getElementById('myControls').classList.add('hidden');
-                document.getElementById('joinedAs').innerText = `${translations[currentLang].spectator}`;
-            } else {
-                document.getElementById('joinedAs').innerText = `${translations[currentLang].joinedAs} ${translations[currentLang].player} ${role}`;
-            }
+            updateGameUIStrings();
         };
 
-        async function resizeImage(base64Str) {
-            return new Promise((resolve) => {
-                const img = new Image();
-                img.src = base64Str;
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    let width = img.width, height = img.height;
-                    const max_size = 500;
-                    if (width > height) { if (width > max_size) { height *= max_size / width; width = max_size; } }
-                    else { if (height > max_size) { width *= max_size / height; height = max_size; } }
-                    canvas.width = width; canvas.height = height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, width, height);
-                    resolve(canvas.toDataURL('image/jpeg', 0.6));
-                };
-            });
+        function updateGameUIStrings() {
+            const t = translations[currentLang];
+            document.getElementById('joinedAs').innerText = playerRole === 'spectator' ? t.spectator : `${t.joinedAs} ${t.player} ${playerRole}`;
         }
-
-        window.handleFileUpload = (event) => {
-            const file = event.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                const compressed = await resizeImage(e.target.result);
-                renderCard('myCardContent', compressed);
-                const roomRef = doc(db, 'artifacts', appId, 'public', 'data', roomId);
-                await updateDoc(roomRef, { [`p${playerRole}`]: compressed });
-            };
-            reader.readAsDataURL(file);
-        };
 
         window.updateCardOnline = async () => {
             const val = document.getElementById('cardInput').value.trim();
-            if (!val) return;
-            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', roomId);
-            await updateDoc(roomRef, { [`p${playerRole}`]: val });
+            if (!val || playerRole === 'spectator') return;
+            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', roomId), { [`p${playerRole}`]: val });
             document.getElementById('cardInput').value = "";
         };
 
-        function renderCard(id, val) {
-            const container = document.getElementById(id);
-            if (!container) return;
-            const t = translations[currentLang];
-            if (val && val.startsWith('data:image')) {
-                container.innerHTML = `<img src="${val}" class="w-full h-full object-contain bg-black rounded-xl" />`;
-            } else if (val) {
-                container.innerHTML = `<span class="p-4 text-center font-bold text-slate-800 break-words leading-tight">${val}</span>`;
-            } else {
-                container.innerHTML = `<span class="text-slate-400 font-bold text-xs">${t.empty}</span>`;
-            }
-        }
-
         function updateGameUI(data) {
             const t = translations[currentLang];
-            
-            // My Card
-            if (playerRole !== 'spectator') {
-                renderCard('myCardContent', data[`p${playerRole}`]);
-                document.getElementById('pOwnCard').classList.toggle('is-flipped', !!data.open);
-                const toggleBtn = document.getElementById('toggleRevealBtn');
-                const isRevealed = data[`p${playerRole}Reveal`];
-                toggleBtn.innerText = isRevealed ? t.hideFromAll : t.showToAll;
-            }
-
-            // Others View
             const othersGrid = document.getElementById('othersGrid');
             othersGrid.innerHTML = '';
             
             for(let i=1; i<=maxPlayers; i++) {
-                if (i === playerRole) continue;
-                
-                const val = data[`p${i}`];
+                if (i === playerRole) {
+                    renderCard('myCardContent', data[`p${i}`]);
+                    continue;
+                }
                 const isRevealed = data.open || data[`p${i}Reveal`];
-                const isImg = val?.startsWith('data:image');
-                
-                const cardHtml = `
-                    <div class="flex flex-col items-center space-y-3">
-                        <span class="text-[10px] font-bold text-white/50 uppercase tracking-wider">${t.player} ${i}</span>
-                        <div class="perspective w-32 h-44 sm:w-40 sm:h-56">
+                const val = data[`p${i}`];
+                othersGrid.insertAdjacentHTML('beforeend', `
+                    <div class="flex flex-col items-center gap-2">
+                        <span class="text-[10px] opacity-50 font-bold uppercase tracking-widest">${t.player} ${i}</span>
+                        <div class="perspective w-full max-w-[140px] aspect-[3/4]">
                             <div class="card-inner ${isRevealed ? 'is-flipped' : ''}">
-                                <div class="card-face card-front text-3xl shadow-xl">🕵️</div>
-                                <div id="card-p${i}" class="card-face card-back overflow-hidden border-4 border-indigo-400/50 shadow-2xl">
-                                    ${isRevealed ? (isImg ? `<img src="${val}" class="w-full h-full object-contain bg-black"/>` : `<span class="p-3 text-sm font-black text-slate-800 text-center">${val || ''}</span>`) : ''}
+                                <div class="card-face card-front bg-slate-800 border border-white/10 shadow-2xl text-3xl">?</div>
+                                <div class="card-face card-back bg-white text-slate-900 font-bold p-2 text-center text-sm overflow-hidden flex items-center justify-center">
+                                    ${isRevealed ? (val?.startsWith('data:image') ? `<img src="${val}" class="w-full h-full object-contain"/>` : val || '') : ''}
                                 </div>
                             </div>
                         </div>
-                        <span class="text-[9px] font-bold px-3 py-1 rounded-full bg-white/5 ${val ? 'text-green-400 border border-green-500/20' : 'text-slate-500'}">
-                            ${val ? (isImg ? t.isImage : t.isWord) : t.waiting}
-                        </span>
+                        ${!data.open && playerRole !== 'spectator' ? `<span class="${val ? 'text-green-500' : 'text-slate-600'} text-[10px] font-bold">${val ? t.ready : t.waitingStatus}</span>` : ''}
                     </div>
-                `;
-                othersGrid.insertAdjacentHTML('beforeend', cardHtml);
+                `);
             }
-
-            // Chat & Reveal
+            
             const log = document.getElementById('guessLog');
             log.innerHTML = (data.chat || []).slice().reverse().map(msg => `
-                <div class="p-3 rounded-2xl mb-2 text-xs flex flex-col ${msg.isCorrect ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white text-center shadow-lg' : (msg.sender === playerRole ? 'bg-indigo-600/80 self-end ml-auto' : 'bg-white/10 border border-white/5')}">
-                    <span class="opacity-50 text-[8px] font-bold mb-1">${msg.sender === playerRole ? t.you : t.player + ' ' + msg.sender} • ${msg.time}</span>
-                    <span class="font-medium leading-relaxed">${msg.isCorrect ? t.correctGuess + msg.text : msg.text}</span>
+                <div class="p-3 rounded-xl text-xs ${msg.isCorrect ? 'bg-green-600 border-l-4 border-green-300' : 'bg-white/5'} mb-2">
+                    <span class="opacity-50 font-bold">${msg.sender == playerRole ? t.you : t.player + ' ' + msg.sender}:</span> ${msg.text}
                 </div>
             `).join('');
-
-            document.getElementById('revealBtn').style.display = data.open ? 'none' : 'block';
-            document.getElementById('resetBtnContainer').style.display = data.open ? 'block' : 'none';
+            document.getElementById('resetBtnContainer').classList.toggle('hidden', !data.open);
         }
 
-        window.toggleMyCardReveal = async () => {
-            if (playerRole === 'spectator') return;
-            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', roomId);
-            const snap = await getDoc(roomRef);
-            const currentStatus = snap.data()[`p${playerRole}Reveal`] || false;
-            await updateDoc(roomRef, { [`p${playerRole}Reveal`]: !currentStatus });
-        };
+        function renderCard(id, val) {
+            const el = document.getElementById(id);
+            if (val?.startsWith('data:image')) el.innerHTML = `<img src="${val}" class="w-full h-full object-contain bg-black rounded-lg"/>`;
+            else el.innerText = val || translations[currentLang].empty;
+        }
 
         window.sendGuessOnline = async () => {
             const input = document.getElementById('guessInput');
             const text = input.value.trim();
             if (!text || playerRole === 'spectator') return;
-            
             const roomRef = doc(db, 'artifacts', appId, 'public', 'data', roomId);
-            const snap = await getDoc(roomRef);
-            const data = snap.data();
-            
+            const data = (await getDoc(roomRef)).data();
             let isCorrect = false;
-            for(let i=1; i<=maxPlayers; i++) {
-                if (i !== playerRole && data[`p${i}`] && !data[`p${i}`].startsWith('data:image')) {
-                    if (text.toLowerCase() === data[`p${i}`].toLowerCase()) isCorrect = true;
-                }
+            for(let i=1; i<=maxPlayers; i++) { 
+                if(i !== playerRole && text.toLowerCase() === (data[`p${i}`] || "").toLowerCase()) isCorrect = true; 
             }
-
             await updateDoc(roomRef, {
-                chat: arrayUnion({ 
-                    text, 
-                    sender: playerRole, 
-                    isCorrect, 
-                    time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) 
-                }),
+                chat: arrayUnion({ text, sender: playerRole, isCorrect, time: new Date().toLocaleTimeString() }),
                 open: isCorrect || data.open
             });
             input.value = "";
         };
 
         window.revealAll = async () => {
-            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', roomId);
-            await updateDoc(roomRef, { open: true });
+            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', roomId), { open: true });
         };
 
-        window.forceResetRoom = async () => {
+        window.resetRoom = async () => {
             const roomRef = doc(db, 'artifacts', appId, 'public', 'data', roomId);
-            await setDoc(roomRef, { maxPlayers: 2, chat: [], open: false });
+            const resetData = { maxPlayers: 2, chat: [], open: false };
+            for(let i=1; i<=maxPlayers; i++) {
+                resetData[`p${i}`] = "";
+                resetData[`p${i}Id`] = "";
+            }
+            await setDoc(roomRef, resetData);
             location.reload();
         };
 
-        // Auth Logic
         const initAuth = async () => {
             if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                 await signInWithCustomToken(auth, __initial_auth_token);
@@ -317,183 +249,130 @@
             }
         };
 
-        onAuthStateChanged(auth, (user) => {
+        onAuthStateChanged(auth, (user) => { 
             if (user) { 
                 currentUser = user; 
                 initRoomListener(); 
-                applyTranslations();
-            } else {
-                initAuth();
-            }
+                applyTranslations(); 
+            } else { 
+                initAuth(); 
+            } 
         });
-
-        window.onload = () => { applyTranslations(); };
     </script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&family=Outfit:wght@400;700;900&display=swap');
-        
-        :root {
-            --primary: #6366f1;
-            --accent: #22d3ee;
-        }
-
-        body { 
-            background: #020617;
-            color: white; 
-            font-family: 'Outfit', 'Cairo', sans-serif; 
-            min-height: 100vh; 
-            overflow-x: hidden;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-        
-        /* Animated Background Particles */
-        .bg-animate {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: radial-gradient(circle at 50% 50%, #1e1b4b 0%, #020617 100%);
-            z-index: -2;
-        }
-        .bg-animate::after {
-            content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background-image: radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px);
-            background-size: 40px 40px;
-            animation: move 60s linear infinite;
-        }
-        @keyframes move { from { transform: translateY(0); } to { transform: translateY(-1000px); } }
-
-        .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(15px); border: 1px solid rgba(255, 255, 255, 0.08); }
-        .perspective { perspective: 1200px; }
-        .card-inner { transition: transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1); transform-style: preserve-3d; width: 100%; height: 100%; position: relative; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        body { background: #080c14; color: white; font-family: 'Inter', sans-serif; overflow-x: hidden; }
+        .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.08); }
+        .perspective { perspective: 1000px; }
+        .card-inner { transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1); transform-style: preserve-3d; width: 100%; height: 100%; position: relative; }
         .is-flipped { transform: rotateY(180deg); }
-        .card-face { backface-visibility: hidden; position: absolute; width: 100%; height: 100%; border-radius: 1.5rem; display: flex; align-items: center; justify-content: center; }
-        .card-back { transform: rotateY(180deg); background: #f8fafc; color: #1e293b; }
-        .card-front { background: linear-gradient(135deg, #312e81, #1e1b4b); box-shadow: inset 0 0 30px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); }
-        
-        .animate-float { animation: float 4s ease-in-out infinite; }
-        @keyframes float { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-15px) rotate(1deg); } }
-
-        .btn-fancy {
-            position: relative; overflow: hidden; transition: all 0.3s ease;
-        }
-        .btn-fancy::before {
-            content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-            transition: 0.5s;
-        }
-        .btn-fancy:hover::before { left: 100%; }
-
-        ::-webkit-scrollbar { width: 5px; }
-        ::-webkit-scrollbar-thumb { background: rgba(99, 102, 241, 0.5); border-radius: 10px; }
+        .card-face { backface-visibility: hidden; position: absolute; width: 100%; height: 100%; border-radius: 1.5rem; display: flex; align-items: center; justify-content: center; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
+        .card-back { transform: rotateY(180deg); }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
     </style>
 </head>
-<body class="p-4 sm:p-8">
-    <div class="bg-animate"></div>
-
-    <!-- Header Section -->
-    <div class="w-full max-w-6xl flex justify-between items-center mb-10 z-10">
-        <div class="flex flex-col">
-            <h1 data-t="title" class="text-4xl sm:text-5xl font-black tracking-tighter italic bg-gradient-to-r from-indigo-400 via-cyan-400 to-indigo-400 bg-[length:200%_auto] bg-clip-text text-transparent animate-[gradient_4s_linear_infinite] animate-float">Elite Guessing</h1>
-            <span data-t="subtitle" class="text-[10px] text-white/30 tracking-[0.4em] uppercase font-bold">Elite Gaming Experience</span>
+<body class="p-4 md:p-8 flex flex-col items-center min-h-screen">
+    
+    <!-- Top Bar -->
+    <div class="w-full max-w-6xl flex justify-between items-center mb-10">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center font-black text-xl shadow-lg shadow-indigo-500/20">G</div>
+            <div>
+                <h1 data-t="title" class="text-xl font-black tracking-tighter uppercase italic">Guess My Card ULTRA</h1>
+                <div class="flex items-center gap-2">
+                    <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                    <p data-t="subtitle" class="text-[9px] opacity-40 font-bold uppercase tracking-[0.2em]">Encrypted Session</p>
+                </div>
+            </div>
         </div>
-        <div class="flex items-center gap-4">
-            <button onclick="toggleLanguage()" data-t="langBtn" class="glass px-6 py-2 rounded-full text-xs font-black hover:bg-indigo-600/20 border border-indigo-500/30 transition-all shadow-lg">العربية</button>
-            <button onclick="forceResetRoom()" class="text-red-400/40 hover:text-red-400 text-[10px] font-bold uppercase transition-colors">Reset Room</button>
+        <div class="flex gap-2">
+            <button onclick="resetRoom()" class="glass px-4 py-2 rounded-xl text-[10px] font-bold text-red-400 hover:bg-red-500/10 transition-all uppercase" data-t="resetRoom">Reset</button>
+            <button onclick="toggleLanguage()" data-t="langBtn" class="bg-white text-black px-4 py-2 rounded-xl text-[10px] font-black uppercase hover:scale-105 transition-all">العربية</button>
         </div>
     </div>
 
-    <!-- Setup Zone -->
-    <div id="setupZone" class="w-full max-w-2xl glass p-10 rounded-[3rem] text-center shadow-2xl animate-in zoom-in duration-700 relative overflow-hidden">
-        <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-cyan-500"></div>
-        <p data-t="setupDesc" class="text-slate-400 mb-10 text-lg">Choose room capacity and your slot to begin</p>
+    <!-- Setup View -->
+    <div id="setupZone" class="w-full max-w-xl glass p-10 rounded-[3rem] text-center shadow-2xl relative overflow-hidden">
+        <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-indigo-500 to-transparent opacity-50"></div>
+        <p data-t="setupDesc" class="text-sm opacity-50 mb-10 leading-relaxed">Choose your position. Your card remains hidden until someone guesses it correctly!</p>
         
-        <div class="mb-12 p-6 bg-white/5 rounded-3xl border border-white/5 inline-block w-full max-w-sm shadow-inner">
-            <p id="capacityTitle" class="text-xs font-black mb-5 text-indigo-400 uppercase tracking-widest">Room Capacity</p>
-            <div class="flex justify-center gap-4">
-                <button onclick="setCapacity(2)" class="w-14 h-14 rounded-2xl bg-slate-800 hover:bg-indigo-600 transition-all font-black text-xl flex items-center justify-center">2</button>
-                <button onclick="setCapacity(3)" class="w-14 h-14 rounded-2xl bg-slate-800 hover:bg-indigo-600 transition-all font-black text-xl flex items-center justify-center">3</button>
-                <button onclick="setCapacity(4)" class="w-14 h-14 rounded-2xl bg-slate-800 hover:bg-indigo-600 transition-all font-black text-xl flex items-center justify-center">4</button>
+        <div class="mb-10">
+            <span id="capacityText" class="text-[10px] font-black opacity-30 block mb-4 uppercase tracking-widest">Room Capacity</span>
+            <div class="flex justify-center gap-3">
+                <button onclick="setCapacity(2)" class="w-12 h-12 rounded-2xl glass hover:bg-indigo-600 transition-all font-black">2</button>
+                <button onclick="setCapacity(3)" class="w-12 h-12 rounded-2xl glass hover:bg-indigo-600 transition-all font-black">3</button>
+                <button onclick="setCapacity(4)" class="w-12 h-12 rounded-2xl glass hover:bg-indigo-600 transition-all font-black">4</button>
             </div>
         </div>
 
-        <div id="playerGrid" class="grid grid-cols-2 gap-5 max-w-md mx-auto mb-6">
-            <!-- Slots injected here -->
-        </div>
-
-        <button onclick="setupGame('spectator')" data-t="spectator" class="w-full max-w-md p-4 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 font-bold text-sm transition-all text-slate-300">Spectator Mode 👁️</button>
+        <div id="playerGrid" class="grid grid-cols-2 gap-6 mb-8"></div>
+        <button onclick="setupGame('spectator')" data-t="spectator" class="w-full p-4 rounded-2xl border border-white/5 hover:bg-white/5 text-[10px] font-black opacity-40 uppercase tracking-widest transition-all">Watch as Spectator</button>
     </div>
 
-    <!-- Game Zone -->
-    <div id="gameZone" class="hidden w-full max-w-6xl space-y-8 animate-in slide-in-from-bottom duration-700">
-        <!-- Status Bar -->
-        <div class="glass py-3 px-8 rounded-full flex justify-between items-center border-indigo-500/20">
-            <span id="joinedAs" class="text-[11px] font-black uppercase text-indigo-300 tracking-wider">Joined: ...</span>
-            <div class="flex items-center gap-2">
-                <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                <span class="text-[10px] opacity-50 font-bold uppercase">Live Connection</span>
+    <!-- Game View -->
+    <div id="gameZone" class="hidden w-full max-w-6xl space-y-8 animate-in fade-in duration-700">
+        <div class="flex items-center justify-between glass px-8 py-4 rounded-2xl border-l-4 border-indigo-500">
+            <span id="joinedAs" class="text-xs font-black uppercase tracking-widest text-indigo-400">PLAYER ROLE</span>
+            <div class="flex items-center gap-4 text-[10px] font-bold opacity-40">
+                <span class="hidden md:inline">SERVER: GLOBAL_AUTO</span>
+                <span class="hidden md:inline">ENCRYPTION: SECURE</span>
             </div>
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            
-            <!-- My Controls (Left) -->
-            <div id="myControls" class="lg:col-span-4 glass p-8 rounded-[2.5rem] flex flex-col items-center shadow-2xl relative">
-                <div class="w-full flex justify-between items-center mb-6">
-                    <h3 data-t="myCard" class="text-xs font-black text-indigo-400 uppercase tracking-widest">My Secret Card</h3>
-                    <button id="toggleRevealBtn" onclick="toggleMyCardReveal()" class="btn-fancy bg-indigo-600 text-[10px] px-5 py-2 rounded-full font-black shadow-lg shadow-indigo-600/30">Show 👀</button>
+            <!-- Player Card Section -->
+            <div class="lg:col-span-4 space-y-4">
+                <div class="glass p-8 rounded-[2.5rem] flex flex-col items-center shadow-2xl relative overflow-hidden">
+                    <div class="absolute -top-10 -right-10 w-32 h-32 bg-indigo-600/10 blur-3xl rounded-full"></div>
+                    <div class="flex w-full gap-2 mb-8">
+                        <input id="cardInput" data-t="chatPlaceholder" class="flex-1 bg-white/5 border border-white/10 rounded-2xl p-4 text-xs outline-none focus:ring-2 ring-indigo-500/50 transition-all">
+                        <button onclick="updateCardOnline()" class="bg-indigo-600 hover:bg-indigo-500 w-12 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-600/20 transition-all">💾</button>
+                        <label class="bg-slate-800 hover:bg-slate-700 w-12 rounded-2xl flex items-center justify-center cursor-pointer transition-all">
+                            <input type="file" class="hidden" accept="image/*" onchange="handleImageUpload(event)">
+                            <span data-t="upload">📷</span>
+                        </label>
+                    </div>
+                    
+                    <div class="perspective w-full max-w-[220px] aspect-[3/4]">
+                        <div id="pOwnCard" class="card-inner cursor-pointer" onclick="this.classList.toggle('is-flipped')">
+                            <div class="card-face card-front bg-gradient-to-br from-indigo-900 to-slate-900 border border-white/10 text-5xl">🕵️</div>
+                            <div id="myCardContent" class="card-face card-back bg-white text-slate-900 font-black p-6 text-center text-xl overflow-hidden"></div>
+                        </div>
+                    </div>
+                    <p class="text-[9px] mt-6 opacity-30 font-bold uppercase tracking-widest">Click card to preview</p>
                 </div>
-                
-                <div class="flex w-full gap-3 mb-8">
-                    <input id="cardInput" data-t="chatPlaceholder" class="flex-1 bg-black/40 rounded-2xl p-4 text-sm border border-white/5 outline-none focus:ring-2 ring-indigo-500/50 transition-all placeholder:text-white/10">
-                    <button onclick="updateCardOnline()" class="bg-indigo-600 w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all">✔️</button>
-                    <button onclick="document.getElementById('fileIn').click()" class="bg-slate-800 w-14 h-14 rounded-2xl flex items-center justify-center hover:bg-slate-700 transition-all">📷</button>
-                    <input type="file" id="fileIn" class="hidden" accept="image/*" onchange="handleFileUpload(event)">
-                </div>
+            </div>
 
-                <div class="perspective w-56 h-80">
-                    <div id="pOwnCard" class="card-inner cursor-pointer" onclick="this.classList.toggle('is-flipped')">
-                        <div class="card-face card-front text-5xl">🔒</div>
-                        <div id="myCardContent" class="card-face card-back border-4 border-indigo-500/50 overflow-hidden bg-white"></div>
+            <!-- Opponents Section -->
+            <div class="lg:col-span-8 glass p-8 rounded-[2.5rem] shadow-2xl">
+                <div id="othersGrid" class="grid grid-cols-2 sm:grid-cols-3 gap-8"></div>
+            </div>
+        </div>
+
+        <!-- Chat Feed -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div class="glass p-8 rounded-[2.5rem] shadow-xl flex flex-col h-[350px]">
+                <h3 data-t="chatTitle" class="text-[10px] font-black uppercase opacity-30 mb-6 tracking-widest">Intelligence Feed</h3>
+                <div id="guessLog" class="flex-1 overflow-y-auto mb-6 pr-2 space-y-1"></div>
+                <div class="flex gap-3">
+                    <input id="guessInput" data-t="chatPlaceholder" class="flex-1 bg-white/5 border border-white/10 p-4 rounded-2xl text-xs outline-none focus:ring-2 ring-indigo-500/50" onkeypress="if(event.key==='Enter') sendGuessOnline()">
+                    <button onclick="sendGuessOnline()" data-t="send" class="bg-indigo-600 hover:bg-indigo-500 px-8 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-indigo-600/20">SEND</button>
+                </div>
+            </div>
+
+            <div class="flex flex-col gap-6 h-[350px]">
+                <div class="flex-1 glass p-8 rounded-[2.5rem] flex flex-col items-center justify-center text-center gap-6 group">
+                    <div class="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center text-red-500 text-2xl group-hover:scale-110 transition-transform">🎯</div>
+                    <div>
+                        <button onclick="revealAll()" data-t="reveal" class="bg-red-500/10 text-red-500 border border-red-500/20 px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all">Force Reveal</button>
                     </div>
                 </div>
-                <p data-t="peekHint" class="mt-6 text-[10px] font-bold text-white/20 uppercase tracking-tighter">Click your card to reveal/hide</p>
-            </div>
-
-            <!-- Others (Right) -->
-            <div class="lg:col-span-8 glass p-8 rounded-[2.5rem] shadow-2xl flex flex-col">
-                <h3 data-t="title" class="text-xs font-black mb-10 text-slate-400 uppercase tracking-[0.3em] text-center">Elite Board</h3>
-                <div id="othersGrid" class="grid grid-cols-2 sm:grid-cols-3 gap-10 justify-items-center items-start">
-                    <!-- Opponents Cards injected here -->
+                <div id="resetBtnContainer" class="hidden">
+                    <button onclick="resetRoom()" data-t="restart" class="w-full bg-green-500 hover:bg-green-400 p-6 rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-xl shadow-green-500/20 text-slate-900 transition-all">Restart Global Session</button>
                 </div>
             </div>
         </div>
-
-        <!-- Chat & Controls Row -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <!-- Log -->
-            <div class="md:col-span-2 glass p-8 rounded-[3rem] shadow-xl">
-                <h3 data-t="chatTitle" class="text-xs font-black mb-6 text-indigo-400 uppercase tracking-widest">Feed & Activity</h3>
-                <div id="guessLog" class="h-64 overflow-y-auto flex flex-col gap-3 p-4 bg-black/30 rounded-3xl border border-white/5 shadow-inner"></div>
-                <div class="mt-6 flex gap-4">
-                    <input id="guessInput" data-t="chatPlaceholder" class="flex-1 bg-white/5 p-5 rounded-2xl text-sm border border-white/5 outline-none focus:bg-white/10 transition-all" onkeypress="if(event.key==='Enter') sendGuessOnline()">
-                    <button onclick="sendGuessOnline()" data-t="send" class="bg-indigo-600 px-10 rounded-2xl font-black text-xs hover:bg-indigo-500 shadow-xl shadow-indigo-600/20 active:scale-95 transition-all">SEND</button>
-                </div>
-            </div>
-            
-            <!-- Global Actions -->
-            <div class="glass p-8 rounded-[3rem] flex flex-col justify-center gap-6 text-center">
-                <button id="revealBtn" onclick="revealAll()" data-t="reveal" class="w-full bg-red-500/10 text-red-400 border border-red-500/20 p-6 rounded-3xl font-black text-xs hover:bg-red-500 hover:text-white transition-all shadow-lg">REVEAL ALL 🏁</button>
-                <div id="resetBtnContainer" class="hidden w-full">
-                    <button onclick="forceResetRoom()" data-t="restart" class="w-full bg-green-600 p-6 rounded-3xl font-black text-lg shadow-xl shadow-green-600/30 hover:scale-105 transition-all">RESTART 🔄</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Footer -->
-    <div class="mt-12 py-6 text-white/20 text-[9px] font-black uppercase tracking-[0.6em] z-10 flex flex-col items-center gap-2">
-        <span>Elite Guessing Experience</span>
-        <div class="w-12 h-0.5 bg-indigo-500/20"></div>
     </div>
 </body>
 </html>
