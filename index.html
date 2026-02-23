@@ -12,19 +12,33 @@
 
         /**
          * SECURITY CONFIGURATION:
-         * We are using Vite/Process env logic. 
-         * For local development, these values come from your .env file.
-         * For GitHub/Production, these come from your Secrets.
+         * Improved error handling for environment variables.
          */
-        const firebaseConfig = {
-            apiKey: import.meta.env?.VITE_FIREBASE_API_KEY || "", 
-            authDomain: import.meta.env?.VITE_FIREBASE_AUTH_DOMAIN || "",
-            projectId: import.meta.env?.VITE_FIREBASE_PROJECT_ID || "",
-            storageBucket: import.meta.env?.VITE_FIREBASE_STORAGE_BUCKET || "",
-            messagingSenderId: import.meta.env?.VITE_FIREBASE_MESSAGING_SENDER_ID || "",
-            appId: import.meta.env?.VITE_FIREBASE_APP_ID || ""
+        const getFirebaseConfig = () => {
+            try {
+                // Try to get from environment, fallback to hardcoded for direct browser testing
+                return {
+                    apiKey: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_FIREBASE_API_KEY) || "AIzaSyCnmD9VzAwryverdyflav-PCPyNOT1yvqM", 
+                    authDomain: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_FIREBASE_AUTH_DOMAIN) || "gueeswhat-552c5.firebaseapp.com",
+                    projectId: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_FIREBASE_PROJECT_ID) || "gueeswhat-552c5",
+                    storageBucket: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_FIREBASE_STORAGE_BUCKET) || "gueeswhat-552c5.firebasestorage.app",
+                    messagingSenderId: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_FIREBASE_MESSAGING_SENDER_ID) || "589839614487",
+                    appId: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_FIREBASE_APP_ID) || "1:589839614487:web:4852541c28a12b67e55252"
+                };
+            } catch (e) {
+                console.warn("Env check failed, using default config");
+                return {
+                    apiKey: "AIzaSyCnmD9VzAwryverdyflav-PCPyNOT1yvqM",
+                    authDomain: "gueeswhat-552c5.firebaseapp.com",
+                    projectId: "gueeswhat-552c5",
+                    storageBucket: "gueeswhat-552c5.firebasestorage.app",
+                    messagingSenderId: "589839614487",
+                    appId: "1:589839614487:web:4852541c28a12b67e55252"
+                };
+            }
         };
 
+        const firebaseConfig = getFirebaseConfig();
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
@@ -72,7 +86,7 @@
             }
         };
 
-        let currentLang = 'en'; // Default language is English
+        let currentLang = 'en'; 
 
         // Handle Image Upload
         window.handleImageUpload = (event) => {
@@ -82,7 +96,11 @@
             reader.onload = async (e) => {
                 const base64Image = e.target.result;
                 if (playerRole && playerRole !== 'spectator') {
-                    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', roomId), { [`p${playerRole}`]: base64Image });
+                    try {
+                        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', roomId), { [`p${playerRole}`]: base64Image });
+                    } catch (err) {
+                        console.error("Upload error:", err);
+                    }
                 }
             };
             reader.readAsDataURL(file);
@@ -118,7 +136,9 @@
                 maxPlayers = data.maxPlayers || 2;
                 updateSetupUI(data);
                 if (playerRole) updateGameUI(data);
-            }, (err) => console.error("Sync Error:", err));
+            }, (err) => {
+                console.error("Sync Error (Check API Permissions):", err);
+            });
         };
 
         function updateSetupUI(data) {
@@ -132,7 +152,9 @@
                 const btn = document.createElement('button');
                 btn.className = `p-6 rounded-2xl font-bold transition-all shadow-xl flex flex-col items-center justify-center ${isMe ? 'bg-green-500 ring-4' : isOccupied ? 'bg-slate-800 opacity-50 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-500'}`;
                 btn.innerHTML = `<span class="text-lg">${isMe ? t.you : t.player + ' ' + i}</span>`;
-                btn.onclick = () => !isOccupied && setupGame(i);
+                btn.onclick = () => {
+                    if (!isOccupied) setupGame(i);
+                };
                 grid.appendChild(btn);
             }
             document.getElementById('capacityText').innerText = `${t.capacity} ${maxPlayers}`;
@@ -141,17 +163,28 @@
         window.setCapacity = async (val) => {
             if (playerRole) return;
             const roomRef = doc(db, 'artifacts', appId, 'public', 'data', roomId);
-            await updateDoc(roomRef, { maxPlayers: val });
+            try {
+                await updateDoc(roomRef, { maxPlayers: val });
+            } catch (e) {
+                console.error("Action blocked:", e);
+            }
         };
 
         window.setupGame = async (role) => {
-            if (!currentUser) return;
+            if (!currentUser) {
+                console.error("Auth not ready");
+                return;
+            }
             playerRole = role;
             const roomRef = doc(db, 'artifacts', appId, 'public', 'data', roomId);
-            if (role !== 'spectator') await updateDoc(roomRef, { [`p${role}Id`]: currentUser.uid });
-            document.getElementById('setupZone').classList.add('hidden');
-            document.getElementById('gameZone').classList.remove('hidden');
-            updateGameUIStrings();
+            try {
+                if (role !== 'spectator') await updateDoc(roomRef, { [`p${role}Id`]: currentUser.uid });
+                document.getElementById('setupZone').classList.add('hidden');
+                document.getElementById('gameZone').classList.remove('hidden');
+                updateGameUIStrings();
+            } catch (e) {
+                console.error("Join failed:", e);
+            }
         };
 
         function updateGameUIStrings() {
@@ -162,8 +195,12 @@
         window.updateCardOnline = async () => {
             const val = document.getElementById('cardInput').value.trim();
             if (!val || playerRole === 'spectator') return;
-            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', roomId), { [`p${playerRole}`]: val });
-            document.getElementById('cardInput').value = "";
+            try {
+                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', roomId), { [`p${playerRole}`]: val });
+                document.getElementById('cardInput').value = "";
+            } catch (e) {
+                console.error("Card update failed:", e);
+            }
         };
 
         function updateGameUI(data) {
@@ -213,21 +250,27 @@
             const input = document.getElementById('guessInput');
             const text = input.value.trim();
             if (!text || playerRole === 'spectator') return;
-            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', roomId);
-            const data = (await getDoc(roomRef)).data();
-            let isCorrect = false;
-            for(let i=1; i<=maxPlayers; i++) { 
-                if(i !== playerRole && text.toLowerCase() === (data[`p${i}`] || "").toLowerCase()) isCorrect = true; 
+            try {
+                const roomRef = doc(db, 'artifacts', appId, 'public', 'data', roomId);
+                const data = (await getDoc(roomRef)).data();
+                let isCorrect = false;
+                for(let i=1; i<=maxPlayers; i++) { 
+                    if(i !== playerRole && text.toLowerCase() === (data[`p${i}`] || "").toLowerCase()) isCorrect = true; 
+                }
+                await updateDoc(roomRef, {
+                    chat: arrayUnion({ text, sender: playerRole, isCorrect, time: new Date().toLocaleTimeString() }),
+                    open: isCorrect || data.open
+                });
+                input.value = "";
+            } catch (e) {
+                console.error("Guess failed:", e);
             }
-            await updateDoc(roomRef, {
-                chat: arrayUnion({ text, sender: playerRole, isCorrect, time: new Date().toLocaleTimeString() }),
-                open: isCorrect || data.open
-            });
-            input.value = "";
         };
 
         window.revealAll = async () => {
-            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', roomId), { open: true });
+            try {
+                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', roomId), { open: true });
+            } catch (e) { console.error(e); }
         };
 
         window.resetRoom = async () => {
@@ -237,15 +280,21 @@
                 resetData[`p${i}`] = "";
                 resetData[`p${i}Id`] = "";
             }
-            await setDoc(roomRef, resetData);
-            location.reload();
+            try {
+                await setDoc(roomRef, resetData);
+                location.reload();
+            } catch (e) { console.error(e); }
         };
 
         const initAuth = async () => {
-            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                await signInWithCustomToken(auth, __initial_auth_token);
-            } else {
-                await signInAnonymously(auth);
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (e) {
+                console.error("Auth Error (Check Firebase Keys):", e);
             }
         };
 
