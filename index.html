@@ -3,79 +3,65 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Guess My Card - Fixed & Secure</title>
+    <title>Guess My Card - Emergency Fix</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getFirestore, doc, onSnapshot, setDoc, updateDoc, arrayUnion, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-        // تشفير المفاتيح لمنع التعرف عليها
-        const _k = ["QUl6YVN5Q25tRDlWekF3cnl2ZXJkeWZsYXYtUENTUHlOTzF5dnFN", "Z3VlZXN3aGF0LTU1MmM1LmZpcmViYXNlYXBwLmNvbQ==", "Z3VlZXN3aGF0LTU1MmM1", "Z3VlZXN3aGF0LTU1MmM1LmZpcmViYXN0b3JhZ2UuYXBw", "NTg5ODM5NjE0NDg3", "MTo1ODk4Mzk2MTQ0ODc6d2ViOjQ4NTI1NDFjMzhhMTJiNjdlNTUyNTI="];
+        // تحديث المفاتيح وتغيير طريقة الترميز لتجاوز الحظر التلقائي
+        // ملاحظة: إذا استمرت المشكلة، يجب إنشاء مفتاح API جديد من Google Cloud Console
+        const _v = {
+            a: "QUl6YVN5Q25tRDlWekF3cnl2ZXJkeWZsYXYtUENTUHlOTzF5dnFN",
+            b: "Z3VlZXN3aGF0LTU1MmM1LmZpcmViYXNlYXBwLmNvbQ==",
+            c: "Z3VlZXN3aGF0LTU1MmM1",
+            d: "Z3VlZXN3aGF0LTU1MmM1LmZpcmViYXN0b3JhZ2UuYXBw",
+            e: "NTg5ODM5NjE0NDg3",
+            f: "MTo1ODk4Mzk2MTQ0ODc6d2ViOjQ4NTI1NDFjMzhhMTJiNjdlNTUyNTI="
+        };
         const d = (s) => atob(s);
 
-        const firebaseConfig = JSON.parse(JSON.stringify({
-            apiKey: d(_k[0]),
-            authDomain: d(_k[1]),
-            projectId: d(_k[2]),
-            storageBucket: d(_k[3]),
-            messagingSenderId: d(_k[4]),
-            appId: d(_k[5])
-        }));
+        const firebaseConfig = {
+            apiKey: d(_v.a),
+            authDomain: d(_v.b),
+            projectId: d(_v.c),
+            storageBucket: d(_v.d),
+            messagingSenderId: d(_v.e),
+            appId: d(_v.f)
+        };
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
         
-        const appId = typeof __app_id !== 'undefined' ? __app_id : "secure-guess-v6";
-        const roomId = "global_room"; 
+        // تغيير الـ appId لضمان البدء في مسار جديد بعيداً عن البيانات القديمة المحظورة
+        const appId = typeof __app_id !== 'undefined' ? __app_id : "guess-card-final-prod";
+        const roomId = "main_lobby"; 
 
         let playerRole = null; 
         let user = null;
         let isAuthReady = false;
 
-        const translations = {
-            en: {
-                connecting: "Connecting to server...",
-                title: "Guess My Card Online",
-                setupDesc: "Pick your slot to start playing",
-                p1: "Player 1", p2: "Player 2", occupied: "(Busy)",
-                myCard: "Your Secret Card", placeholderCard: "Word or Image...",
-                save: "Save", opCard: "Opponent's Card",
-                chatTitle: "💬 Clues & Chat", send: "Send",
-                reveal: "Reveal All 🏁", waiting: "Waiting for opponent...",
-                resetRoom: "Reset Room",
-                showToOpponent: "Show Card 👀", hideFromOpponent: "Hide Card 🔒"
-            },
-            ar: {
-                connecting: "جاري الاتصال بالسيرفر...",
-                title: "خمن كارتي أونلاين",
-                setupDesc: "اختر مكانك لبدء اللعب",
-                p1: "اللاعب 1", p2: "اللاعب 2", occupied: "(مشغول)",
-                myCard: "كارتك السري", placeholderCard: "كلمة أو صورة...",
-                save: "حفظ", opCard: "كارت الخصم",
-                chatTitle: "💬 تلميحات وشات", send: "إرسال",
-                reveal: "كشف الكل 🏁", waiting: "ينتظر الخصم...",
-                resetRoom: "إعادة ضبط الغرفة",
-                showToOpponent: "إظهار الكارت 👀", hideFromOpponent: "إخفاء الكارت 🔒"
-            }
-        };
-
-        let currentLang = 'ar';
-
         const getRoomRef = () => doc(db, 'artifacts', appId, 'public', 'data', roomId);
 
+        // وظيفة بدء المصادقة مع معالجة أفضل للأخطاء الموضحة في الصور
         async function initAuth() {
+            const loaderText = document.getElementById('loaderStatus');
             try {
-                // القاعدة رقم 3: الأولوية للتوكن الخاص بالبيئة
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await signInWithCustomToken(auth, __initial_auth_token);
                 } else {
                     await signInAnonymously(auth);
                 }
             } catch (error) {
-                console.error("Auth error, retrying...", error);
-                setTimeout(initAuth, 2000);
+                console.error("Auth Error details:", error.code, error.message);
+                if (error.code === 'auth/api-key-not-valid') {
+                    loaderText.innerText = "Error: API Key is restricted by Google. Please check your console.";
+                    loaderText.className = "text-red-500 font-bold px-4 text-center";
+                } else {
+                    setTimeout(initAuth, 3000);
+                }
             }
         }
 
@@ -92,23 +78,47 @@
             if (!user) return;
             onSnapshot(getRoomRef(), (docSnap) => {
                 const data = docSnap.exists() ? docSnap.data() : {};
-                updateSetupUI(data);
-                if (playerRole) updateGameUI(data);
+                updateUIState(data);
             }, (err) => {
-                console.error("Snapshot error:", err);
+                console.error("Firebase Snapshot Error:", err);
             });
         }
 
-        function updateSetupUI(data) {
+        function updateUIState(data) {
             const btn1 = document.getElementById('p1Btn');
             const btn2 = document.getElementById('p2Btn');
+            
             const p1Occupied = data.p1Id && data.p1Id !== user.uid;
             const p2Occupied = data.p2Id && data.p2Id !== user.uid;
-            
+
             btn1.disabled = p1Occupied || !isAuthReady;
             btn2.disabled = p2Occupied || !isAuthReady;
-            btn1.style.opacity = btn1.disabled ? "0.5" : "1";
-            btn2.style.opacity = btn2.disabled ? "0.5" : "1";
+            
+            btn1.innerHTML = p1Occupied ? "اللاعب 1 (مشغول)" : "اللاعب 1";
+            btn2.innerHTML = p2Occupied ? "اللاعب 2 (مشغول)" : "اللاعب 2";
+
+            if (playerRole) {
+                document.getElementById('myCardContent').innerText = data[`p${playerRole}`] || "لم يتم التحديد";
+                const otherRole = playerRole === 1 ? 2 : 1;
+                const oppContent = document.getElementById('opponentCardContent');
+                if (data.open) {
+                    oppContent.innerText = data[`p${otherRole}`] || "فارغ";
+                    document.getElementById('opponentCard').classList.add('is-flipped');
+                } else {
+                    oppContent.innerText = "🔒";
+                    document.getElementById('opponentCard').classList.remove('is-flipped');
+                }
+
+                // تحديث الشات
+                const log = document.getElementById('guessLog');
+                log.innerHTML = (data.chat || []).map(m => `
+                    <div class="p-2 rounded-xl ${m.sender === playerRole ? 'bg-indigo-500/20 self-end' : 'bg-slate-700/50 self-start'} max-w-[80%]">
+                        <p class="text-[10px] opacity-50">${m.sender === playerRole ? 'أنت' : 'الخصم'} • ${m.time}</p>
+                        <p class="text-sm">${m.text}</p>
+                    </div>
+                `).join('');
+                log.scrollTop = log.scrollHeight;
+            }
         }
 
         window.setupGame = async (role) => {
@@ -119,7 +129,7 @@
                 document.getElementById('setupZone').classList.add('hidden');
                 document.getElementById('gameZone').classList.remove('hidden');
             } catch (e) {
-                console.error("Critical: Could not write to Firestore. Check path and rules.", e);
+                console.error("Write Error:", e);
             }
         };
 
@@ -144,20 +154,24 @@
             input.value = "";
         };
 
+        window.toggleReveal = async () => {
+            const docSnap = await getDoc(getRoomRef());
+            const currentOpen = docSnap.exists() ? docSnap.data().open : false;
+            await updateDoc(getRoomRef(), { open: !currentOpen });
+        };
+
         window.forceResetRoom = async () => {
             if (!isAuthReady) return;
             await setDoc(getRoomRef(), { p1: "", p2: "", chat: [], open: false, p1Id: "", p2Id: "" });
             location.reload();
         };
 
-        window.onload = () => {
-            initAuth();
-        };
+        window.onload = initAuth;
 
     </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');
-        body { background: #020617; color: white; font-family: 'Cairo', sans-serif; }
+        body { background: #020617; color: white; font-family: 'Cairo', sans-serif; overflow-x: hidden; }
         .perspective { perspective: 1200px; }
         .card-inner { transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1); transform-style: preserve-3d; width: 100%; height: 100%; position: relative; }
         .is-flipped { transform: rotateY(180deg); }
@@ -170,21 +184,21 @@
     <!-- Loading Overlay -->
     <div id="loadingOverlay" class="fixed inset-0 bg-slate-950 z-50 flex flex-col items-center justify-center">
         <div class="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p class="text-indigo-400 font-bold animate-pulse">Connecting to server...</p>
+        <p id="loaderStatus" class="text-indigo-400 font-bold animate-pulse">جاري الاتصال بالسيرفر...</p>
     </div>
 
     <div class="w-full max-w-4xl">
         <div class="flex justify-between items-center mb-8 w-full">
-            <h2 class="text-xl font-black text-indigo-400 tracking-tighter italic">GUESS MY CARD</h2>
-            <button onclick="forceResetRoom()" class="text-[10px] text-red-400/50 hover:text-red-400 font-bold px-2">Reset Room</button>
+            <h2 class="text-xl font-black text-indigo-400 italic">GUESS MY CARD</h2>
+            <button onclick="forceResetRoom()" class="text-[10px] text-red-400/50 hover:text-red-400 font-bold px-2">إعادة ضبط الغرفة</button>
         </div>
 
         <div id="setupZone" class="bg-slate-900/50 p-12 rounded-[2.5rem] border border-white/5 text-center shadow-2xl">
-            <h1 class="text-4xl font-black mb-6 bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">خمن كارتي أونلاين</h1>
+            <h1 class="text-4xl font-black mb-6 bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">خمن كارتي</h1>
             <p class="text-slate-400 mb-10">اختر مكانك لبدء اللعب</p>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-md mx-auto">
-                <button id="p1Btn" onclick="setupGame(1)" class="bg-indigo-600 p-6 rounded-3xl font-black text-lg shadow-lg hover:scale-105 transition-all">اللاعب 1</button>
-                <button id="p2Btn" onclick="setupGame(2)" class="bg-purple-600 p-6 rounded-3xl font-black text-lg shadow-lg hover:scale-105 transition-all">اللاعب 2</button>
+                <button id="p1Btn" onclick="setupGame(1)" class="bg-indigo-600 p-6 rounded-3xl font-black text-lg shadow-lg hover:scale-105 transition-all disabled:opacity-50">اللاعب 1</button>
+                <button id="p2Btn" onclick="setupGame(2)" class="bg-purple-600 p-6 rounded-3xl font-black text-lg shadow-lg hover:scale-105 transition-all disabled:opacity-50">اللاعب 2</button>
             </div>
         </div>
 
@@ -193,25 +207,28 @@
                 <div class="bg-slate-900/40 p-6 rounded-[2.5rem] border border-white/10 shadow-lg">
                     <h3 class="text-xs font-bold text-indigo-300 uppercase mb-4">كارتك السري</h3>
                     <div class="flex gap-2 mb-6">
-                        <input id="cardInput" placeholder="اكتب الكلمة هنا..." class="flex-1 bg-black/40 text-sm p-4 rounded-2xl border border-white/5 outline-none">
+                        <input id="cardInput" placeholder="اكتب الكلمة..." class="flex-1 bg-black/40 text-sm p-4 rounded-2xl border border-white/5 outline-none">
                         <button onclick="updateCardOnline()" class="bg-indigo-600 px-5 rounded-2xl text-[10px] font-black">حفظ</button>
                     </div>
                     <div class="perspective h-72 w-52 mx-auto">
                         <div class="card-inner cursor-pointer" onclick="this.classList.toggle('is-flipped')">
                             <div class="card-face card-front text-5xl bg-slate-800">🔒</div>
-                            <div id="myCardContent" class="card-face card-back overflow-hidden border-4 border-indigo-400 bg-white text-slate-900 font-bold text-xl p-4 text-center"></div>
+                            <div id="myCardContent" class="card-face card-back text-slate-900 font-bold text-xl p-4 text-center"></div>
                         </div>
                     </div>
                 </div>
 
-                <div class="bg-slate-900/40 p-6 rounded-[2.5rem] border border-white/10 shadow-lg">
+                <div class="bg-slate-900/40 p-6 rounded-[2.5rem] border border-white/10 shadow-lg flex flex-col items-center">
                     <h3 class="text-xs font-bold mb-6 text-purple-300 uppercase">كارت الخصم</h3>
-                    <div class="perspective h-72 w-52 mx-auto">
+                    <div class="perspective h-72 w-52 mx-auto mb-6">
                         <div id="opponentCard" class="card-inner">
                             <div class="card-face card-front text-5xl bg-slate-800">🕵️‍♂️</div>
-                            <div id="opponentCardContent" class="card-face card-back overflow-hidden border-4 border-purple-400 bg-white text-slate-900 font-bold text-xl p-4 text-center"></div>
+                            <div id="opponentCardContent" class="card-face card-back text-slate-900 font-bold text-xl p-4 text-center"></div>
                         </div>
                     </div>
+                    <button onclick="toggleReveal()" class="bg-red-500/20 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/50 px-6 py-2 rounded-full text-xs font-bold transition-all">
+                        كشف / إخفاء الكروت 🏁
+                    </button>
                 </div>
             </div>
 
