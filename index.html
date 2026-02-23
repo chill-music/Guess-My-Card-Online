@@ -8,40 +8,25 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getFirestore, doc, onSnapshot, setDoc, updateDoc, arrayUnion, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-
-        // Obfuscated Configuration to prevent simple scraping while ensuring validity
-        const _k = "QUl6YVN5QXZWck9UX3F2bk50bmF1RjZ6Z0Z6N19wRHFfSndFVEcw"; // New Key from Image
-        const _d = "Z2FtZWd1ZXNzMS1lMTk0MC5maXJlYmFzZWFwcC5jb20=";
-        const _p = "Z2FtZWd1ZXNzMS1lMTk0MA==";
-        const _s = "Z2FtZWd1ZXNzMS1lMTk0MC5maXJlYmFzZXN0b3JhZ2UuYXBw";
-        const _m = "MTA0MDcxNTQ1NTk4NA==";
-        const _a = "MToxMDQwNzE1NDU1OTg0OndlYjo1ZDNjMTYyNWNiNGRlMGMzYmU5MTM1";
-        
-        const dec = (v) => atob(v).trim();
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
         const firebaseConfig = {
-            apiKey: dec(_k),
-            authDomain: dec(_d),
-            projectId: dec(_p),
-            storageBucket: dec(_s),
-            messagingSenderId: dec(_m),
-            appId: dec(_a)
+            apiKey: "AIzaSyCnmD9VzAwryverdyflav-PCPyNOT1yvqM",
+            authDomain: "gueeswhat-552c5.firebaseapp.com",
+            projectId: "gueeswhat-552c5",
+            storageBucket: "gueeswhat-552c5.firebasestorage.app",
+            messagingSenderId: "589839614487",
+            appId: "1:589839614487:web:4852541c28a12b67e55252"
         };
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
         
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'gameguess1-e1940';
-        const roomId = "global_room_v1"; 
-
         let playerRole = null; 
-        let user = null;
-        let currentLang = 'en';
-
-        // Updated path to follow Rule 1: /artifacts/{appId}/public/data/{docId}
-        const getRoomRef = () => doc(db, 'artifacts', appId, 'public', 'data', roomId);
+        let currentUser = null;
+        let lastLoadedValue = null; 
+        const roomId = "stable_v5_global"; 
 
         const translations = {
             en: {
@@ -52,14 +37,13 @@
                 save: "Save", upload: "📷", opCard: "Opponent's Card",
                 peekHint: "Click to flip your card", chatTitle: "💬 Clues & Chat",
                 chatPlaceholder: "Type your guess...", send: "Send",
-                reveal: "Reveal All 🏁", waiting: "Waiting for opponent...",
+                reveal: "Reveal All 🏁", waiting: "Waiting for card...",
                 empty: "Empty", you: "You", opponent: "Opponent",
                 langBtn: "العربية", correctGuess: "🎉 Correct! It was: ",
                 reset: "Restart Game 🔄", resetRoom: "Reset Room",
                 showToOpponent: "Show Card 👀", hideFromOpponent: "Hide Card 🔒",
                 isImage: "Opponent picked an Image 📷",
-                isWord: "Opponent picked a Word 📝",
-                connecting: "Connecting to server..."
+                isWord: "Opponent picked a Word 📝"
             },
             ar: {
                 title: "خمن كارتي أونلاين",
@@ -69,19 +53,20 @@
                 save: "حفظ", upload: "📷", opCard: "كارت الخصم",
                 peekHint: "اضغط لقلب كارتك ورؤيته", chatTitle: "💬 تلميحات وشات",
                 chatPlaceholder: "اكتب تخمينك هنا...", send: "إرسال",
-                reveal: "كشف الكل 🏁", waiting: "ينتظر الخصم...",
+                reveal: "كشف الكل 🏁", waiting: "ينتظر وضع الكارت...",
                 empty: "فارغ", you: "أنت", opponent: "الخصم",
                 langBtn: "English", correctGuess: "🎉 صحيح! الكلمة هي: ",
                 reset: "إعادة اللعب 🔄", resetRoom: "إعادة ضبط الغرفة",
                 showToOpponent: "إظهار الكارت 👀", hideFromOpponent: "إخفاء الكارت 🔒",
                 isImage: "الخصم اختار صورة 📷",
-                isWord: "الخصم اختار كلمة 📝",
-                connecting: "جاري الاتصال بالسيرفر..."
+                isWord: "الخصم اختار كلمة 📝"
             }
         };
 
+        let currentLang = 'en';
+
         window.toggleLanguage = () => {
-            currentLang = currentLang === 'en' ? 'ar' : 'en';
+            currentLang = currentLang === 'ar' ? 'en' : 'ar';
             applyTranslations();
         };
 
@@ -95,38 +80,13 @@
             });
         }
 
-        async function initAuth() {
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-            } catch (err) {
-                console.error("Auth Error:", err);
-                // Simple retry logic for production stability
-                setTimeout(initAuth, 2000);
-            }
-        }
-
-        onAuthStateChanged(auth, (u) => {
-            if (u) {
-                user = u;
-                document.getElementById('loadingOverlay').classList.add('hidden');
-                initRoomListener();
-            }
-        });
-
         const initRoomListener = () => {
-            onSnapshot(getRoomRef(), (docSnap) => {
-                const data = docSnap.exists() ? docSnap.data() : {};
+            const roomRef = doc(db, 'games', roomId);
+            onSnapshot(roomRef, (docSnap) => {
+                if (!docSnap.exists()) return;
+                const data = docSnap.data();
                 updateSetupUI(data);
                 if (playerRole) updateGameUI(data);
-            }, (err) => {
-                console.error("Firestore Error:", err);
-                if(err.code === 'permission-denied') {
-                    console.warn("Check Firestore Rules: Ensure they allow read/write to the artifacts path.");
-                }
             });
         };
 
@@ -134,93 +94,132 @@
             const t = translations[currentLang];
             const btn1 = document.getElementById('p1Btn');
             const btn2 = document.getElementById('p2Btn');
-            const p1Occupied = data.p1Id && data.p1Id !== user?.uid;
-            const p2Occupied = data.p2Id && data.p2Id !== user?.uid;
-            
-            btn1.disabled = p1Occupied;
+            const p1Occupied = data.p1Id && data.p1Id !== currentUser?.uid;
+            const p2Occupied = data.p2Id && data.p2Id !== currentUser?.uid;
+            btn1.disabled = p1Occupied; btn1.style.opacity = p1Occupied ? "0.5" : "1";
             btn1.innerText = p1Occupied ? `${t.p1} ${t.occupied}` : t.p1;
-            btn1.className = p1Occupied ? "bg-slate-700 p-6 rounded-3xl font-black opacity-50 cursor-not-allowed" : "bg-indigo-600 p-6 rounded-3xl font-black shadow-lg hover:scale-105 transition-all";
-
-            btn2.disabled = p2Occupied;
+            btn2.disabled = p2Occupied; btn2.style.opacity = p2Occupied ? "0.5" : "1";
             btn2.innerText = p2Occupied ? `${t.p2} ${t.occupied}` : t.p2;
-            btn2.className = p2Occupied ? "bg-slate-700 p-6 rounded-3xl font-black opacity-50 cursor-not-allowed" : "bg-purple-600 p-6 rounded-3xl font-black shadow-lg hover:scale-105 transition-all";
         }
 
         window.setupGame = async (role) => {
-            if (!user) return;
+            if (!currentUser) return;
             playerRole = role;
+            const roomRef = doc(db, 'games', roomId);
             try {
-                await setDoc(getRoomRef(), { [`p${role}Id`]: user.uid }, { merge: true });
-                document.getElementById('setupZone').classList.add('hidden');
-                document.getElementById('gameZone').classList.remove('hidden');
-            } catch(e) { console.error("Setup Failed:", e); }
+                await updateDoc(roomRef, { [`p${role}Id`]: currentUser.uid });
+            } catch (e) {
+                await setDoc(roomRef, { [`p${role}Id`]: currentUser.uid, p1: "", p2: "", chat: [], open: false }, { merge: true });
+            }
+            document.getElementById('setupZone').classList.add('hidden');
+            document.getElementById('gameZone').classList.remove('hidden');
         };
 
-        window.updateCardOnline = async () => {
-            const val = document.getElementById('cardInput').value.trim();
-            if (!val) return;
-            await updateDoc(getRoomRef(), { [`p${playerRole}`]: val });
-            document.getElementById('cardInput').value = "";
-        };
+        // NEW: Function to resize and compress image to avoid Firestore limits
+        async function resizeImage(base64Str) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.src = base64Str;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+                    const max_size = 500; // Resize to max 500px to stay under 1MB limit
+
+                    if (width > height) {
+                        if (width > max_size) {
+                            height *= max_size / width;
+                            width = max_size;
+                        }
+                    } else {
+                        if (height > max_size) {
+                            width *= max_size / height;
+                            height = max_size;
+                        }
+                    }
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    resolve(canvas.toDataURL('image/jpeg', 0.7)); // Compress as JPEG at 70% quality
+                };
+            });
+        }
 
         window.handleFileUpload = (event) => {
             const file = event.target.files[0];
             if (!file) return;
             const reader = new FileReader();
             reader.onload = async (e) => {
-                const img = new Image();
-                img.src = e.target.result;
-                img.onload = async () => {
-                    const canvas = document.createElement('canvas');
-                    const MAX_WIDTH = 400;
-                    const scale = MAX_WIDTH / img.width;
-                    canvas.width = MAX_WIDTH;
-                    canvas.height = img.height * scale;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                    const compressed = canvas.toDataURL('image/jpeg', 0.6);
-                    await updateDoc(getRoomRef(), { [`p${playerRole}`]: compressed });
-                };
+                const originalBase64 = e.target.result;
+                // Compress before saving
+                const compressedBase64 = await resizeImage(originalBase64);
+                lastLoadedValue = compressedBase64; 
+                renderMyCard(compressedBase64);
+                await updateDoc(doc(db, 'games', roomId), { [`p${playerRole}`]: compressedBase64 });
             };
             reader.readAsDataURL(file);
         };
+
+        window.updateCardOnline = async () => {
+            const val = document.getElementById('cardInput').value.trim();
+            if (!val) return;
+            lastLoadedValue = val; 
+            await updateDoc(doc(db, 'games', roomId), { [`p${playerRole}`]: val });
+            document.getElementById('cardInput').value = "";
+        };
+
+        function renderMyCard(val) {
+            const container = document.getElementById('myCardContent');
+            if (val && val.startsWith('data:image')) {
+                container.innerHTML = `<img src="${val}" class="w-full h-full object-contain bg-black rounded-lg" />`;
+            } else if (val) {
+                container.innerHTML = `<span class="p-4 text-center text-xl font-bold text-slate-800 break-words">${val}</span>`;
+            } else {
+                container.innerHTML = `<span class="text-slate-400 font-bold">${translations[currentLang].empty}</span>`;
+            }
+        }
 
         function updateGameUI(data) {
             const t = translations[currentLang];
             const myVal = playerRole === 1 ? data.p1 : data.p2;
             const opVal = playerRole === 1 ? data.p2 : data.p1;
-            const myRevealState = data[`p${playerRole}Reveal`] || false;
-            const opRevealState = data[`p${playerRole === 1 ? 2 : 1}Reveal`] || false;
+            const myRevealState = playerRole === 1 ? data.p1Reveal : data.p2Reveal;
+            const opRevealState = playerRole === 1 ? data.p2Reveal : data.p1Reveal;
 
-            const myContent = document.getElementById('myCardContent');
-            if (myVal && myVal.startsWith('data:image')) {
-                myContent.innerHTML = `<img src="${myVal}" class="w-full h-full object-contain bg-black rounded-lg" />`;
-            } else if (myVal) {
-                myContent.innerHTML = `<span class="p-4 text-center text-xl font-bold text-slate-800 break-words">${myVal}</span>`;
-            } else {
-                myContent.innerHTML = `<span class="text-slate-400 font-bold">${t.empty}</span>`;
-            }
+            renderMyCard(lastLoadedValue || myVal);
 
             const opDisplay = document.getElementById('opponentCardContent');
             const opStatus = document.getElementById('opStatusText');
             const opCardEl = document.getElementById('opponentCard');
 
-            if (opVal) {
+            if (opVal && opVal.trim() !== "") {
                 const isImg = opVal.startsWith('data:image');
                 opStatus.innerText = isImg ? t.isImage : t.isWord;
-                opStatus.className = "text-[11px] font-black uppercase text-green-400 animate-pulse";
+                opStatus.classList.add('text-green-400', 'animate-pulse');
+                opStatus.classList.remove('text-slate-400');
+
                 if (data.open || opRevealState) {
-                    opDisplay.innerHTML = isImg ? `<img src="${opVal}" class="w-full h-full object-contain bg-black rounded-lg" />` : `<span class="p-4 text-center text-xl font-bold text-slate-800 break-words">${opVal}</span>`;
+                    if (isImg) {
+                        opDisplay.innerHTML = `<img src="${opVal}" class="w-full h-full object-contain bg-black rounded-lg" />`;
+                    } else {
+                        opDisplay.innerHTML = `<span class="p-4 text-center text-xl font-bold text-slate-800 break-words">${opVal}</span>`;
+                    }
                     opCardEl.classList.add('is-flipped');
                 } else {
-                    opDisplay.innerHTML = ""; opCardEl.classList.remove('is-flipped');
+                    opDisplay.innerHTML = "";
+                    opCardEl.classList.remove('is-flipped');
                 }
             } else {
-                opStatus.innerText = t.waiting; opStatus.className = "text-[11px] font-black uppercase text-slate-500";
-                opDisplay.innerHTML = ""; opCardEl.classList.remove('is-flipped');
+                opStatus.innerText = t.waiting;
+                opStatus.classList.remove('text-green-400', 'animate-pulse');
+                opStatus.classList.add('text-slate-400');
+                opDisplay.innerHTML = "";
+                opCardEl.classList.remove('is-flipped');
             }
 
-            document.getElementById('toggleRevealBtn').innerText = myRevealState ? t.hideFromOpponent : t.showToOpponent;
+            const toggleBtn = document.getElementById('toggleRevealBtn');
+            toggleBtn.innerText = myRevealState ? t.hideFromOpponent : t.showToOpponent;
             
             if (data.open) {
                 document.getElementById('resetBtnContainer').classList.remove('hidden');
@@ -233,44 +232,53 @@
 
             const log = document.getElementById('guessLog');
             log.innerHTML = (data.chat || []).slice().reverse().map(msg => `
-                <div class="p-3 rounded-2xl mb-2 max-w-[85%] ${msg.isCorrect ? 'bg-green-600 mx-auto text-center w-full' : (msg.sender === playerRole ? 'bg-indigo-600 self-end ml-auto' : 'bg-white/10 self-start mr-auto')}">
-                    <p class="text-[10px] opacity-60 font-bold">${msg.sender === playerRole ? t.you : t.opponent}</p>
+                <div class="p-3 rounded-2xl mb-2 max-w-[85%] ${msg.isCorrect ? 'bg-green-600 mx-auto text-center w-full shadow-lg' : (msg.sender === playerRole ? 'bg-indigo-600 self-end ml-auto' : 'bg-white/10 self-start mr-auto')}">
+                    <p class="text-[10px] opacity-60 font-bold">${msg.sender === playerRole ? t.you : t.opponent} • ${msg.time}</p>
                     <p class="text-sm font-medium break-words">${msg.isCorrect ? t.correctGuess + msg.text : msg.text}</p>
                 </div>
             `).join('');
         }
 
         window.toggleMyCardReveal = async () => {
-            const snap = await getDoc(getRoomRef());
-            const current = snap.exists() ? (snap.data()[`p${playerRole}Reveal`] || false) : false;
-            await updateDoc(getRoomRef(), { [`p${playerRole}Reveal`]: !current });
+            const roomRef = doc(db, 'games', roomId);
+            const snap = await getDoc(roomRef);
+            if (!snap.exists()) return;
+            const currentStatus = snap.data()[`p${playerRole}Reveal`] || false;
+            await updateDoc(roomRef, { [`p${playerRole}Reveal`]: !currentStatus });
         };
 
         window.sendGuessOnline = async () => {
             const input = document.getElementById('guessInput');
             const text = input.value.trim();
             if (!text) return;
-            const snap = await getDoc(getRoomRef());
+            const roomRef = doc(db, 'games', roomId);
+            const snap = await getDoc(roomRef);
             const data = snap.data();
             const opVal = playerRole === 1 ? data.p2 : data.p1;
             const isCorrect = opVal && !opVal.startsWith('data:image') && text.toLowerCase() === opVal.toLowerCase();
-            await updateDoc(getRoomRef(), {
-                chat: arrayUnion({ text, sender: playerRole, isCorrect, time: Date.now() }),
+            await updateDoc(roomRef, {
+                chat: arrayUnion({ text, sender: playerRole, isCorrect, time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) }),
                 open: isCorrect || data.open
             });
             input.value = "";
         };
 
         window.revealAll = async () => {
-            await updateDoc(getRoomRef(), { open: true, p1Reveal: true, p2Reveal: true });
+            await updateDoc(doc(db, 'games', roomId), { open: true, p1Reveal: true, p2Reveal: true });
         };
 
         window.forceResetRoom = async () => {
-            await setDoc(getRoomRef(), { p1: "", p2: "", chat: [], open: false, p1Id: "", p2Id: "", p1Reveal: false, p2Reveal: false });
+            lastLoadedValue = null; 
+            await setDoc(doc(db, 'games', roomId), { p1: "", p2: "", chat: [], open: false, p1Id: "", p2Id: "", p1Reveal: false, p2Reveal: false });
             location.reload();
         };
 
-        window.onload = () => { applyTranslations(); initAuth(); };
+        onAuthStateChanged(auth, async (user) => {
+            if (user) { currentUser = user; initRoomListener(); } 
+            else { await signInAnonymously(auth); }
+        });
+
+        window.onload = () => { applyTranslations(); };
     </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');
@@ -284,23 +292,17 @@
     </style>
 </head>
 <body class="p-4 min-h-screen flex flex-col items-center">
-    
-    <div id="loadingOverlay" class="fixed inset-0 bg-slate-950 flex flex-col items-center justify-center z-50">
-        <div class="animate-spin w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full mb-4"></div>
-        <p data-t="connecting">Connecting to server...</p>
-    </div>
-
     <div class="w-full max-w-4xl">
         <div class="flex justify-between items-center mb-8 w-full">
-            <h2 class="text-xl font-black text-indigo-400 italic">GUESS MY CARD ULTRA</h2>
+            <h2 class="text-xl font-black text-indigo-400 tracking-tighter italic">GUESS MY CARD ULTRA</h2>
             <div class="flex gap-2">
-                <button onclick="toggleLanguage()" data-t="langBtn" class="bg-white/10 px-4 py-2 rounded-xl text-xs font-bold hover:bg-white/20">العربية</button>
+                <button onclick="toggleLanguage()" data-t="langBtn" class="bg-white/10 px-4 py-2 rounded-xl text-xs font-bold hover:bg-white/20 transition-all">العربية</button>
                 <button onclick="forceResetRoom()" data-t="resetRoom" class="text-[10px] text-red-400/50 hover:text-red-400 uppercase font-bold px-2">Reset Room</button>
             </div>
         </div>
 
         <div id="setupZone" class="bg-slate-900/50 p-12 rounded-[2.5rem] border border-white/5 text-center backdrop-blur-xl shadow-2xl">
-            <h1 data-t="title" class="text-4xl font-black mb-6 bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent italic">Guess My Card Online</h1>
+            <h1 data-t="title" class="text-4xl font-black mb-6 bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">Guess My Card Online</h1>
             <p data-t="setupDesc" class="text-slate-400 mb-10">Pick your slot to start playing</p>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-md mx-auto">
                 <button id="p1Btn" onclick="setupGame(1)" data-t="p1" class="bg-indigo-600 p-6 rounded-3xl font-black text-lg shadow-lg hover:scale-105 transition-all">Player 1</button>
@@ -313,30 +315,31 @@
                 <div class="bg-slate-900/40 p-6 rounded-[2.5rem] border border-white/10 shadow-lg backdrop-blur-sm">
                     <div class="flex justify-between items-center mb-6">
                         <h3 data-t="myCard" class="text-xs font-bold text-indigo-300 uppercase tracking-widest">Your Secret Card</h3>
-                        <button id="toggleRevealBtn" onclick="toggleMyCardReveal()" data-t="showToOpponent" class="bg-indigo-500/10 text-indigo-400 text-[10px] px-4 py-2 rounded-xl border border-indigo-500/20 font-bold">Show Card 👀</button>
+                        <button id="toggleRevealBtn" onclick="toggleMyCardReveal()" data-t="showToOpponent" class="bg-indigo-500/10 text-indigo-400 text-[10px] px-4 py-2 rounded-xl border border-indigo-500/20 hover:bg-indigo-500 hover:text-white transition-all font-bold">Show Card 👀</button>
                     </div>
                     <div class="flex gap-2 mb-6">
-                        <input id="cardInput" data-t="placeholderCard" class="flex-1 bg-black/40 text-sm p-4 rounded-2xl border border-white/5 outline-none focus:border-indigo-500 placeholder:text-slate-600">
+                        <input id="cardInput" data-t="placeholderCard" class="flex-1 bg-black/40 text-sm p-4 rounded-2xl border border-white/5 outline-none focus:border-indigo-500 transition-all placeholder:text-slate-600">
                         <button onclick="updateCardOnline()" data-t="save" class="bg-indigo-600 px-5 rounded-2xl text-[10px] font-black">SAVE</button>
-                        <button onclick="document.getElementById('fileIn').click()" class="bg-slate-800 px-4 rounded-2xl hover:bg-slate-700">📷</button>
+                        <button onclick="document.getElementById('fileIn').click()" class="bg-slate-800 px-4 rounded-2xl hover:bg-slate-700 transition-colors">📷</button>
                         <input type="file" id="fileIn" class="hidden" accept="image/*" onchange="handleFileUpload(event)">
                     </div>
                     <div class="perspective h-72 w-52 mx-auto">
                         <div id="pOwnCard" class="card-inner cursor-pointer" onclick="this.classList.toggle('is-flipped')">
-                            <div class="card-face card-front text-5xl bg-gradient-to-br from-slate-800 to-indigo-950">🔒</div>
+                            <div class="card-face card-front text-5xl bg-gradient-to-br from-slate-800 to-indigo-950 shadow-inner">🔒</div>
                             <div id="myCardContent" class="card-face card-back overflow-hidden border-4 border-indigo-400 bg-white"></div>
                         </div>
                     </div>
+                    <p data-t="peekHint" class="text-[10px] text-center mt-6 text-slate-500 uppercase font-black tracking-widest opacity-60">Click to flip your card</p>
                 </div>
 
                 <div class="bg-slate-900/40 p-6 rounded-[2.5rem] border border-white/10 shadow-lg backdrop-blur-sm">
                     <h3 data-t="opCard" class="text-xs font-bold mb-6 text-purple-300 uppercase tracking-widest">Opponent's Card</h3>
-                    <div class="h-12 flex items-center justify-center mb-4 bg-black/30 rounded-2xl border border-white/5 px-4">
-                         <span id="opStatusText" class="text-[11px] font-black uppercase text-slate-500">Waiting for opponent...</span>
+                    <div class="h-12 flex items-center justify-center mb-4 bg-black/30 rounded-2xl border border-white/5 px-4 text-center">
+                         <span id="opStatusText" class="text-[11px] font-black uppercase tracking-wide transition-all">Waiting for card...</span>
                     </div>
                     <div class="perspective h-72 w-52 mx-auto">
                         <div id="opponentCard" class="card-inner">
-                            <div class="card-face card-front text-5xl bg-gradient-to-br from-slate-800 to-purple-950">🕵️‍♂️</div>
+                            <div class="card-face card-front text-5xl bg-gradient-to-br from-slate-800 to-purple-950 shadow-inner">🕵️‍♂️</div>
                             <div id="opponentCardContent" class="card-face card-back overflow-hidden border-4 border-purple-400 bg-white"></div>
                         </div>
                     </div>
@@ -347,15 +350,15 @@
                 <h3 data-t="chatTitle" class="text-xs font-bold mb-6 text-slate-300 uppercase tracking-widest">💬 Clues & Chat</h3>
                 <div id="guessLog" class="h-56 overflow-y-auto mb-6 p-5 bg-black/40 rounded-[2rem] flex flex-col border border-white/5 gap-2 scroll-smooth"></div>
                 <div class="flex gap-3">
-                    <input id="guessInput" data-t="chatPlaceholder" class="flex-1 bg-black/50 p-5 rounded-[1.5rem] text-sm border border-white/5 outline-none focus:border-indigo-500/50" onkeypress="if(event.key==='Enter') sendGuessOnline()">
-                    <button onclick="sendGuessOnline()" data-t="send" class="bg-indigo-600 px-10 rounded-[1.5rem] text-xs font-black shadow-xl shadow-indigo-600/20 active:scale-95">Send</button>
+                    <input id="guessInput" data-t="chatPlaceholder" class="flex-1 bg-black/50 p-5 rounded-[1.5rem] text-sm border border-white/5 outline-none focus:border-indigo-500/50 transition-all" onkeypress="if(event.key==='Enter') sendGuessOnline()">
+                    <button onclick="sendGuessOnline()" data-t="send" class="bg-indigo-600 px-10 rounded-[1.5rem] text-xs font-black hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-600/20 active:scale-95">SEND</button>
                 </div>
             </div>
 
             <div class="flex flex-col items-center gap-6 py-6">
-                <button id="revealBtn" onclick="revealAll()" data-t="reveal" class="text-red-400 border border-red-400/20 px-10 py-3 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-red-400/10">Reveal All 🏁</button>
+                <button id="revealBtn" onclick="revealAll()" data-t="reveal" class="text-red-400 border border-red-400/20 px-10 py-3 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-red-400/10 transition-all">Reveal All 🏁</button>
                 <div id="resetBtnContainer" class="hidden">
-                    <button onclick="forceResetRoom()" data-t="reset" class="bg-green-600 text-white px-16 py-5 rounded-full font-black text-xl shadow-2xl hover:scale-110 transition-all">Restart Game 🔄</button>
+                    <button onclick="forceResetRoom()" data-t="reset" class="bg-green-600 text-white px-16 py-5 rounded-full font-black text-xl shadow-2xl hover:scale-110 transition-all">RESTART GAME 🔄</button>
                 </div>
             </div>
         </div>
