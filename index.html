@@ -10,13 +10,14 @@
         import { getFirestore, doc, onSnapshot, setDoc, updateDoc, arrayUnion, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
+        // تم تعديل الإعدادات لتستخدم متغيرات البيئة بدلاً من المفاتيح الثابتة لزيادة الأمان
         const firebaseConfig = {
-            apiKey: "AIzaSyCnmD9VzAwryverdyflav-PCPyNOT1yvqM",
-            authDomain: "gueeswhat-552c5.firebaseapp.com",
-            projectId: "gueeswhat-552c5",
-            storageBucket: "gueeswhat-552c5.firebasestorage.app",
-            messagingSenderId: "589839614487",
-            appId: "1:589839614487:web:4852541c28a12b67e55252"
+            apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+            authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+            projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+            storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+            messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+            appId: import.meta.env.VITE_FIREBASE_APP_ID
         };
 
         const app = initializeApp(firebaseConfig);
