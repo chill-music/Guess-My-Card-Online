@@ -32,7 +32,7 @@
 
         const translations = {
             en: {
-                title: "CARD<span class='text-indigo-500'>X</span> ULTRA",
+                title: "CARD<span class='text-white'>X</span> ULTRA",
                 setupDesc: "Pick your name and join the arena",
                 namePlaceholder: "Enter your name...",
                 p1: "Player 1", p2: "Player 2", p3: "Player 3", p4: "Player 4",
@@ -49,7 +49,7 @@
                 saveName: "Save Name"
             },
             ar: {
-                title: "كارد<span class='text-indigo-500'>X</span> الترا",
+                title: "كارد<span class='text-white'>X</span> الترا",
                 setupDesc: "اختر اسمك وانضم للساحة",
                 namePlaceholder: "اكتب اسمك هنا...",
                 p1: "اللاعب 1", p2: "اللاعب 2", p3: "اللاعب 3", p4: "اللاعب 4",
@@ -116,10 +116,10 @@
                 const isOccupied = data[`p${i}Id`] && data[`p${i}Id`] !== currentUser?.uid;
                 btn.disabled = isOccupied;
                 if (isOccupied) {
-                    btn.className = "p-4 md:p-6 rounded-3xl bg-slate-900 border border-white/5 opacity-50 cursor-not-allowed text-center";
+                    btn.className = "p-4 md:p-6 rounded-3xl bg-slate-900 border border-white/5 opacity-50 cursor-not-allowed";
                     btn.innerHTML = `<span class="text-[10px] text-slate-500">${data[`p${i}Name`] || t['p'+i]}</span><br><span class="text-[8px] text-red-500">${t.occupied}</span>`;
                 } else {
-                    btn.className = `p-4 md:p-6 rounded-3xl transition-all hover:scale-105 active:scale-95 shadow-xl font-bold text-center ${i%2==0 ? 'bg-purple-600' : 'bg-indigo-600'}`;
+                    btn.className = `p-4 md:p-6 rounded-3xl transition-all hover:scale-105 active:scale-95 shadow-xl font-bold ${i%2==0 ? 'bg-purple-600' : 'bg-indigo-600'}`;
                     btn.innerHTML = `${t['p'+i]} <span class="block w-2 h-2 bg-green-400 rounded-full mx-auto mt-1 animate-pulse"></span>`;
                 }
             }
@@ -134,7 +134,7 @@
             }
             const saveBtn = document.querySelector('[onclick="updateStoredName()"]');
             saveBtn.innerText = "✓ SAVED";
-            setTimeout(() => saveBtn.innerText = translations[currentLang].saveName, 2000);
+            setTimeout(() => saveBtn.innerText = "SAVE NAME", 2000);
         };
 
         window.setupPlayer = async (role) => {
@@ -145,8 +145,7 @@
             if (role !== 'viewer') {
                 await updateDoc(doc(db, 'games', roomId), { 
                     [`p${role}Id`]: currentUser.uid,
-                    [`p${role}Name`]: userName,
-                    [`p${role}Reveal`]: false
+                    [`p${role}Name`]: userName
                 });
             }
             document.getElementById('lobbySection').classList.add('hidden');
@@ -157,7 +156,7 @@
 
         window.exitToLobby = async () => {
             if (playerRole && playerRole !== 'viewer') {
-                await updateDoc(doc(db, 'games', roomId), { [`p${playerRole}Id`]: "", [`p${playerRole}`]: "", [`p${playerRole}Reveal`]: false });
+                await updateDoc(doc(db, 'games', roomId), { [`p${playerRole}Id`]: "", [`p${playerRole}`]: "" });
             }
             playerRole = null;
             document.getElementById('arenaSection').classList.add('hidden');
@@ -193,14 +192,6 @@
             document.getElementById('cardInput').value = "";
         };
 
-        window.toggleMyReveal = async () => {
-            if (!playerRole || playerRole === 'viewer') return;
-            const roomRef = doc(db, 'games', roomId);
-            const snap = await getDoc(roomRef);
-            const current = snap.data()[`p${playerRole}Reveal`] || false;
-            await updateDoc(roomRef, { [`p${playerRole}Reveal`]: !current });
-        };
-
         window.toggleEmojiPicker = () => {
             const picker = document.getElementById('emojiPicker');
             picker.classList.toggle('hidden');
@@ -211,6 +202,12 @@
             input.value += emoji;
             input.focus();
             toggleEmojiPicker();
+        };
+
+        window.toggleMyReveal = async () => {
+            const snap = await getDoc(doc(db, 'games', roomId));
+            const current = snap.data()[`p${playerRole}Reveal`] || false;
+            await updateDoc(doc(db, 'games', roomId), { [`p${playerRole}Reveal`]: !current });
         };
 
         function updateGameArena(data) {
@@ -240,13 +237,14 @@
                 const isImg = val?.startsWith('data:image');
                 const pName = data[`p${i}Name`] || `Player ${i}`;
                 
+                // التعديل الثاني: ضمان التناسق في الحجم عبر تثبيت الـ aspect ratio والـ max-width
                 grid.innerHTML += `
-                    <div class="glass-panel p-4 rounded-[2rem] flex flex-col items-center animate-in shadow-xl">
+                    <div class="glass-panel p-4 rounded-[2rem] flex flex-col items-center animate-in">
                         <div class="mb-2 bg-black/30 px-3 py-1 rounded-full flex items-center gap-2">
                              <span class="text-[10px] font-black text-indigo-400 uppercase">${pName}</span>
                              <span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
                         </div>
-                        <div class="perspective w-full aspect-[3/4] max-w-[160px]">
+                        <div class="perspective w-full aspect-[3/4] max-w-[200px] mx-auto">
                             <div class="card-inner ${reveal ? 'is-flipped' : ''}">
                                 <div class="card-face card-front shadow-xl bg-slate-900 border border-white/10">
                                     <span class="text-4xl opacity-20">🕵️‍♂️</span>
@@ -262,7 +260,7 @@
 
             const log = document.getElementById('clueLog');
             log.innerHTML = (data.chat || []).slice(-30).reverse().map(m => `
-                <div class="mb-2 p-3 rounded-2xl ${m.isCorrect ? 'bg-green-600 text-white w-full text-center font-black animate-bounce' : (m.sender === playerRole ? 'bg-indigo-600/40 ml-auto' : 'bg-white/5')} max-w-[90%] border border-white/5 shadow-sm">
+                <div class="mb-2 p-3 rounded-2xl ${m.isCorrect ? 'bg-green-600 text-white w-full text-center font-black animate-bounce' : (m.sender === playerRole ? 'bg-indigo-600/40 ml-auto' : 'bg-white/5')} max-w-[90%] border border-white/5">
                     <p class="text-[8px] opacity-60 uppercase font-black mb-1">${m.senderName || 'Anonymous'}</p>
                     <p class="text-xs font-bold leading-relaxed">${m.text}</p>
                 </div>
@@ -333,9 +331,25 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700;800&family=Noto+Sans+Arabic:wght@400;700;900&display=swap');
         body { background: #030712; color: #f8fafc; font-family: 'Plus Jakarta Sans', 'Noto Sans Arabic', sans-serif; overflow-x: hidden; }
-        .glass-panel { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.08); }
-        .logo-animate { background: linear-gradient(to right, #6366f1, #a855f7, #6366f1); background-size: 200% auto; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: gradientMove 3s linear infinite; }
+        .glass-panel { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.08); shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
+        
+        /* التعديل الأول: Logo Animation */
+        .logo-container { display: flex; align-items: center; gap: 10px; }
+        .logo-animate { 
+            background: linear-gradient(to right, #6366f1, #a855f7, #ec4899, #6366f1); 
+            background-size: 200% auto; 
+            -webkit-background-clip: text; 
+            -webkit-text-fill-color: transparent; 
+            animation: gradientMove 3s linear infinite; 
+            font-weight: 900;
+            font-style: italic;
+        }
         @keyframes gradientMove { to { background-position: 200% center; } }
+        .bounce-icon { animation: bounce 2s infinite; }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+        .pulse-sparkle { animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { opacity: 0.5; transform: scale(1); } 50% { opacity: 1; transform: scale(1.2); } 100% { opacity: 0.5; transform: scale(1); } }
+
         .perspective { perspective: 1200px; }
         .card-inner { transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1); transform-style: preserve-3d; width: 100%; height: 100%; position: relative; }
         .is-flipped { transform: rotateY(180deg); }
@@ -350,8 +364,16 @@
 </head>
 <body class="p-4 md:p-8 min-h-screen flex flex-col items-center">
     <div class="max-w-6xl w-full">
+        <!-- Header with animated logo -->
         <header class="flex justify-between items-center mb-8">
-            <h1 id="siteLogoText" class="text-2xl md:text-4xl font-black italic logo-animate">CARDX ULTRA</h1>
+            <div class="logo-container">
+                <div class="relative flex items-center justify-center">
+                    <!-- SVG Gamepad Icon -->
+                    <svg class="w-8 h-8 text-indigo-500 bounce-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="12" x2="10" y2="12"></line><line x1="8" y1="10" x2="8" y2="14"></line><circle cx="15" cy="13" r="1"></circle><circle cx="18" cy="11" r="1"></circle><rect x="2" y="6" width="20" height="12" rx="2"></rect></svg>
+                    <svg class="w-4 h-4 text-yellow-400 absolute -top-1 -right-1 pulse-sparkle" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
+                </div>
+                <h1 id="siteLogoText" class="text-2xl md:text-4xl logo-animate">CARDX ULTRA</h1>
+            </div>
             <div class="flex gap-4">
                 <button onclick="toggleLanguage()" data-t="langBtn" class="bg-white/5 border border-white/10 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest">العربية</button>
                 <button onclick="fullReset()" data-t="resetRoom" class="text-red-500/50 hover:text-red-500 text-[10px] font-black uppercase">Reset</button>
@@ -360,7 +382,7 @@
 
         <!-- Lobby -->
         <div id="lobbySection" class="flex flex-col items-center py-10 animate-in">
-            <div class="glass-panel p-8 md:p-12 rounded-[3rem] text-center w-full max-w-2xl border-b-8 border-indigo-600/20 shadow-2xl">
+            <div class="glass-panel p-8 md:p-12 rounded-[3rem] text-center w-full max-w-2xl border-b-8 border-indigo-600/20">
                 <p data-t="setupDesc" class="text-slate-500 mb-8 text-xs font-bold uppercase tracking-widest">Choose Your Legend</p>
                 <div class="flex gap-2 mb-8">
                     <input id="userNameInput" data-t="namePlaceholder" class="flex-1 bg-black/40 p-4 rounded-2xl border border-white/10 outline-none focus:border-indigo-500 text-center font-bold">
@@ -378,8 +400,8 @@
 
         <!-- Arena -->
         <div id="arenaSection" class="hidden space-y-6 animate-in">
-            <div class="flex justify-between items-center bg-black/30 p-4 rounded-2xl border border-white/5 shadow-md">
-                <button onclick="exitToLobby()" data-t="exit" class="text-red-500 text-[10px] font-black uppercase px-4 py-2 bg-red-500/10 rounded-xl border border-red-500/20 hover:bg-red-500/20">Back to Lobby 🚪</button>
+            <div class="flex justify-between items-center bg-black/30 p-4 rounded-2xl border border-white/5">
+                <button onclick="exitToLobby()" data-t="exit" class="text-red-500 text-[10px] font-black uppercase px-4 py-2 bg-red-500/10 rounded-xl border border-red-500/20">Back to Lobby 🚪</button>
                 <span class="text-[10px] font-black text-indigo-400 uppercase tracking-widest animate-pulse">Live Battle Active</span>
             </div>
 
@@ -388,19 +410,19 @@
                 <div id="mySecretBox" class="lg:col-span-4 glass-panel p-6 rounded-[2.5rem] border-t-4 border-indigo-600 order-2 lg:order-1 shadow-2xl">
                     <div class="flex justify-between items-center mb-6">
                         <h3 data-t="myCard" class="text-xs font-black text-indigo-400 uppercase tracking-widest">Secret Vault</h3>
-                        <button id="revealToggle" onclick="toggleMyReveal()" class="bg-indigo-600 text-white text-[9px] px-4 py-1.5 rounded-xl font-black uppercase shadow-lg shadow-indigo-500/30 tracking-tight active:scale-95 transition-transform">Show 👀</button>
+                        <button id="revealToggle" onclick="toggleMyReveal()" class="bg-indigo-600 text-white text-[9px] px-4 py-1.5 rounded-xl font-black uppercase shadow-lg shadow-indigo-500/30 tracking-tight">Show 👀</button>
                     </div>
                     <div class="flex gap-2 mb-4">
-                        <input id="cardInput" data-t="placeholderCard" class="flex-1 bg-black/40 text-xs p-3 rounded-xl border border-white/5 outline-none focus:border-indigo-500 font-bold">
-                        <button onclick="saveTextCard()" class="bg-indigo-600 px-4 rounded-xl text-[10px] font-black active:scale-95">SAVE</button>
-                        <button onclick="document.getElementById('file').click()" class="bg-slate-800 px-3 rounded-xl text-lg hover:bg-slate-700 transition-colors">📷</button>
+                        <input id="cardInput" data-t="placeholderCard" class="flex-1 bg-black/40 text-xs p-3 rounded-xl border border-white/5 outline-none focus:border-indigo-500">
+                        <button onclick="saveTextCard()" class="bg-indigo-600 px-4 rounded-xl text-[10px] font-black">SAVE</button>
+                        <button onclick="document.getElementById('file').click()" class="bg-slate-800 px-3 rounded-xl text-lg">📷</button>
                         <input type="file" id="file" class="hidden" accept="image/*" onchange="uploadImage(event)">
                     </div>
-                    <div class="perspective w-full aspect-[3/4] max-w-[180px] mx-auto">
+                    <!-- Fixed Aspect Ratio for My Card -->
+                    <div class="perspective w-full aspect-[3/4] max-w-[200px] mx-auto">
                         <div id="myFlipCard" class="card-inner cursor-pointer" onclick="isLocalPreviewOpen = !isLocalPreviewOpen; getDoc(doc(db,'games',roomId)).then(s=>updateGameArena(s.data()))">
-                            <div class="card-face card-front border border-white/10 shadow-lg">
+                            <div class="card-face card-front border border-white/10">
                                 <span class="text-4xl opacity-10">🃏</span>
-                                <p class="absolute bottom-4 text-[8px] font-black text-white/20 uppercase">Tap to Peek</p>
                             </div>
                             <div id="myCardContent" class="card-face card-back overflow-hidden border-4 border-indigo-600 shadow-2xl"></div>
                         </div>
@@ -409,38 +431,31 @@
 
                 <!-- Opponents Grid -->
                 <div class="lg:col-span-8 order-1 lg:order-2">
-                    <div id="opponentsGrid" class="flex flex-wrap justify-center gap-4"></div>
+                    <div id="opponentsGrid" class="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
                 </div>
             </div>
 
             <!-- Chat & Controls -->
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                <div class="lg:col-span-8 glass-panel p-6 rounded-[2.5rem] flex flex-col shadow-xl">
-                    <div id="clueLog" class="h-48 overflow-y-auto mb-4 p-4 bg-black/40 rounded-3xl border border-white/5 custom-scroll flex flex-col-reverse"></div>
+                <div class="lg:col-span-8 glass-panel p-6 rounded-[2.5rem] flex flex-col">
+                    <div id="clueLog" class="h-48 overflow-y-auto mb-4 p-4 bg-black/40 rounded-3xl border border-white/5 custom-scroll"></div>
                     <div class="relative flex gap-2">
-                        <!-- Emoji Picker -->
-                        <div id="emojiPicker" class="hidden absolute bottom-full left-0 mb-4 p-4 glass-panel rounded-3xl grid grid-cols-6 gap-2 z-50 animate-in border border-indigo-500/30 shadow-2xl">
+                        <div id="emojiPicker" class="hidden absolute bottom-full left-0 mb-4 p-4 glass-panel rounded-3xl grid grid-cols-6 gap-2 z-50 animate-in">
                             <button onclick="addEmoji('🔥')" class="text-2xl hover:scale-125 transition-transform">🔥</button>
                             <button onclick="addEmoji('😂')" class="text-2xl hover:scale-125 transition-transform">😂</button>
                             <button onclick="addEmoji('🤔')" class="text-2xl hover:scale-125 transition-transform">🤔</button>
                             <button onclick="addEmoji('👑')" class="text-2xl hover:scale-125 transition-transform">👑</button>
                             <button onclick="addEmoji('💡')" class="text-2xl hover:scale-125 transition-transform">💡</button>
                             <button onclick="addEmoji('🤡')" class="text-2xl hover:scale-125 transition-transform">🤡</button>
-                            <button onclick="addEmoji('💎')" class="text-2xl hover:scale-125 transition-transform">💎</button>
-                            <button onclick="addEmoji('👏')" class="text-2xl hover:scale-125 transition-transform">👏</button>
-                            <button onclick="addEmoji('🚀')" class="text-2xl hover:scale-125 transition-transform">🚀</button>
-                            <button onclick="addEmoji('🎯')" class="text-2xl hover:scale-125 transition-transform">🎯</button>
-                            <button onclick="addEmoji('👻')" class="text-2xl hover:scale-125 transition-transform">👻</button>
-                            <button onclick="addEmoji('🎉')" class="text-2xl hover:scale-125 transition-transform">🎉</button>
                         </div>
                         <button onclick="toggleEmojiPicker()" class="bg-white/5 border border-white/10 w-12 rounded-xl text-lg flex items-center justify-center hover:bg-white/10 transition-colors">😊</button>
-                        <input id="clueInput" data-t="chatPlaceholder" class="flex-1 bg-black/40 p-4 rounded-xl text-sm border border-white/5 outline-none focus:border-indigo-500 font-bold" onkeypress="if(event.key==='Enter') sendClue()">
-                        <button id="sendClueBtn" onclick="sendClue()" data-t="send" class="bg-indigo-600 px-8 rounded-xl text-xs font-black shadow-lg shadow-indigo-500/20 uppercase tracking-widest active:scale-95">SEND</button>
+                        <input id="clueInput" data-t="chatPlaceholder" class="flex-1 bg-black/40 p-4 rounded-xl text-sm border border-white/5 outline-none focus:border-indigo-500" onkeypress="if(event.key==='Enter') sendClue()">
+                        <button id="sendClueBtn" onclick="sendClue()" data-t="send" class="bg-indigo-600 px-8 rounded-xl text-xs font-black shadow-lg shadow-indigo-500/20 uppercase tracking-widest">SEND</button>
                     </div>
                 </div>
                 <div class="lg:col-span-4 flex flex-col gap-3">
-                    <button id="revealBtn" onclick="revealGame()" data-t="reveal" class="h-full min-h-[80px] bg-slate-900 border-2 border-dashed border-red-500/30 rounded-[2rem] text-red-500 text-xs font-black uppercase tracking-widest hover:bg-red-500/5 transition-colors">Reveal All 🏁</button>
-                    <button id="resetBtn" onclick="resetArena()" data-t="reset" class="hidden h-full min-h-[80px] rounded-[2rem] bg-green-600 text-white font-black text-xl shadow-2xl animate-in active:scale-95">NEW ROUND 🔄</button>
+                    <button id="revealBtn" onclick="revealGame()" data-t="reveal" class="h-full bg-slate-900 border-2 border-dashed border-red-500/30 rounded-[2rem] text-red-500 text-xs font-black uppercase tracking-widest hover:bg-red-500/5 transition-colors">Reveal All 🏁</button>
+                    <button id="resetBtn" onclick="resetArena()" data-t="reset" class="hidden h-full rounded-[2rem] bg-green-600 text-white font-black text-xl shadow-2xl animate-in">NEW ROUND 🔄</button>
                 </div>
             </div>
         </div>
