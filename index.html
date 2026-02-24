@@ -31,7 +31,7 @@
 
         const translations = {
             en: {
-                title: "CARD<span class='text-indigo-500 animate-pulse'>X</span> ULTRA",
+                title: "CARD<span class='text-indigo-500'>X</span> ULTRA",
                 setupDesc: "Pick your name and join the arena",
                 namePlaceholder: "Enter your name...",
                 p1: "Player 1", p2: "Player 2", p3: "Player 3", p4: "Player 4",
@@ -44,10 +44,11 @@
                 isImage: "Picked an Image 📷", isWord: "Picked a Word 📝",
                 connecting: "Connecting...", langBtn: "العربية",
                 send: "Send", spectatorView: "Spectator Mode 👀",
-                chatPlaceholder: "Enter guess..."
+                chatPlaceholder: "Enter guess...",
+                saveName: "Save Name"
             },
             ar: {
-                title: "كارد<span class='text-indigo-500 animate-pulse'>X</span> الترا",
+                title: "كارد<span class='text-indigo-500'>X</span> الترا",
                 setupDesc: "اختر اسمك وانضم للساحة",
                 namePlaceholder: "اكتب اسمك هنا...",
                 p1: "اللاعب 1", p2: "اللاعب 2", p3: "اللاعب 3", p4: "اللاعب 4",
@@ -60,7 +61,8 @@
                 isImage: "اختار صورة 📷", isWord: "اختار كلمة 📝",
                 connecting: "جاري الاتصال...", langBtn: "English",
                 send: "إرسال", spectatorView: "وضع المشاهدة 👀",
-                chatPlaceholder: "اكتب توقعك هنا..."
+                chatPlaceholder: "اكتب توقعك هنا...",
+                saveName: "حفظ الاسم"
             }
         };
 
@@ -74,7 +76,7 @@
         function applyTranslations() {
             const t = translations[currentLang];
             document.getElementById('mainHtml').dir = currentLang === 'ar' ? 'rtl' : 'ltr';
-            document.getElementById('siteLogo').innerHTML = t.title;
+            document.getElementById('siteLogoText').innerHTML = t.title;
             document.querySelectorAll('[data-t]').forEach(el => {
                 const key = el.getAttribute('data-t');
                 if (el.tagName === 'INPUT') el.placeholder = t[key];
@@ -111,6 +113,14 @@
                 }
             }
         }
+
+        window.updateStoredName = async () => {
+            const name = document.getElementById('userNameInput').value.trim();
+            if (!name || !playerRole || playerRole === 'viewer') return;
+            await updateDoc(doc(db, 'games', roomId), { 
+                [`p${playerRole}Name`]: name 
+            });
+        };
 
         window.setupPlayer = async (role) => {
             if (!currentUser) return;
@@ -236,7 +246,6 @@
             grid.innerHTML = '';
             const others = activePlayers.filter(id => id !== playerRole);
             
-            // Unified Grid Layout for balanced spacing
             grid.className = "grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6 items-stretch";
 
             others.forEach(i => {
@@ -314,6 +323,24 @@
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700;800&family=Noto+Sans+Arabic:wght@400;700;900&display=swap');
         body { background: #030712; color: #f8fafc; font-family: 'Plus Jakarta Sans', 'Noto Sans Arabic', sans-serif; overflow-x: hidden; -webkit-tap-highlight-color: transparent; }
         .glass-panel { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
+        
+        /* Animated Logo Text */
+        .logo-animate {
+            background: linear-gradient(to right, #6366f1, #a855f7, #6366f1);
+            background-size: 200% auto;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: gradientMove 3s linear infinite, pulseSlow 2s ease-in-out infinite;
+        }
+
+        @keyframes gradientMove {
+            to { background-position: 200% center; }
+        }
+        @keyframes pulseSlow {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.9; transform: scale(1.02); }
+        }
+
         .perspective { perspective: 1200px; }
         .card-inner { transition: transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1); transform-style: preserve-3d; width: 100%; height: 100%; position: relative; }
         .is-flipped { transform: rotateY(180deg); }
@@ -330,7 +357,15 @@
 <body class="p-2 md:p-8 min-h-screen">
     <div class="max-w-6xl mx-auto w-full">
         <header class="flex justify-between items-center mb-6 md:mb-10">
-            <h1 id="siteLogo" class="text-xl md:text-3xl font-black italic">CARD<span class="text-indigo-500">X</span> ULTRA</h1>
+            <div class="flex items-center gap-3">
+                <!-- Site Icon -->
+                <div class="w-10 h-10 md:w-12 md:h-12 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20 rotate-3 animate-bounce">
+                    <svg viewBox="0 0 24 24" class="w-6 h-6 text-white fill-current">
+                        <path d="M19,2H5C3.89,2 3,2.89 3,4V20C3,21.11 3.89,22 5,22H19C20.11,22 21,21.11 21,20V4C21,2.89 20.11,2H19,2M12,17L8,13L12,9L16,13L12,17M12,7L10,5L12,3L14,5L12,7Z" />
+                    </svg>
+                </div>
+                <h1 id="siteLogoText" class="text-xl md:text-4xl font-black italic logo-animate">CARD<span class="text-indigo-500">X</span> ULTRA</h1>
+            </div>
             <div class="flex items-center gap-2 md:gap-4">
                 <button onclick="toggleLanguage()" data-t="langBtn" class="bg-white/5 border border-white/10 px-3 py-1.5 rounded-xl text-[9px] md:text-[10px] font-black uppercase">العربية</button>
                 <button onclick="resetArena()" data-t="resetRoom" class="text-[8px] md:text-[9px] text-red-500/40 hover:text-red-500 font-black uppercase">Reset</button>
@@ -339,11 +374,14 @@
 
         <!-- Lobby -->
         <div id="lobbySection" class="flex flex-col items-center py-4 md:py-10 animate-in">
-            <div class="glass-panel p-6 md:p-12 rounded-[2.5rem] md:rounded-[4rem] text-center w-full max-w-3xl">
-                <h2 data-t="title" class="text-3xl md:text-6xl font-black mb-3">CARD<span class="text-indigo-500">X</span> ULTRA</h2>
+            <div class="glass-panel p-6 md:p-12 rounded-[2.5rem] md:rounded-[4rem] text-center w-full max-w-3xl border-b-8 border-indigo-600/30">
+                <h2 data-t="title" class="text-3xl md:text-6xl font-black mb-3 logo-animate">CARDX ULTRA</h2>
                 <p data-t="setupDesc" class="text-slate-500 mb-8 text-[10px] md:text-xs font-bold uppercase tracking-widest">Pick your name and join</p>
                 
-                <input id="userNameInput" data-t="namePlaceholder" class="w-full bg-black/40 p-4 md:p-5 mb-6 rounded-2xl md:rounded-3xl border border-white/10 outline-none focus:border-indigo-500 text-center font-bold text-sm md:text-base">
+                <div class="flex gap-2 mb-8">
+                    <input id="userNameInput" data-t="namePlaceholder" class="flex-1 bg-black/40 p-4 md:p-5 rounded-2xl md:rounded-3xl border border-white/10 outline-none focus:border-indigo-500 text-center font-bold text-sm md:text-base">
+                    <button onclick="updateStoredName()" data-t="saveName" class="bg-indigo-600 px-6 rounded-2xl md:rounded-3xl font-black text-[10px] md:text-xs shadow-xl active:scale-95 transition-transform">SAVE NAME</button>
+                </div>
 
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 mb-6">
                     <button id="p1Btn" onclick="setupPlayer(1)" class="p-4 rounded-2xl md:rounded-3xl bg-indigo-600 font-black text-[10px] md:text-sm shadow-lg">Player 1</button>
@@ -360,12 +398,11 @@
             <div class="flex justify-between items-center bg-black/20 p-2 md:p-4 rounded-[1.5rem] border border-white/5">
                 <button onclick="exitToLobby()" data-t="exit" class="bg-red-500/10 text-red-500 text-[8px] md:text-[9px] font-black px-4 py-2 md:py-3 rounded-xl border border-red-500/20 uppercase">Back to Lobby 🚪</button>
                 <div class="flex items-center gap-2 pr-2">
-                    <span class="text-[8px] md:text-[10px] font-black text-slate-500 uppercase">Live Arena</span>
+                    <span class="text-[8px] md:text-[10px] font-black text-slate-500 uppercase tracking-tighter">Live Arena</span>
                 </div>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-6 items-start">
-                <!-- My Card Sidebar -->
                 <div id="mySecretBox" class="lg:col-span-4 glass-panel p-4 md:p-6 rounded-[2rem] border-t-4 border-indigo-600 order-2 lg:order-1">
                     <div class="flex justify-between items-center mb-4 md:mb-6">
                         <h3 data-t="myCard" class="text-[9px] md:text-[10px] font-black text-indigo-400 uppercase tracking-widest">Your Secret</h3>
@@ -387,13 +424,11 @@
                     </div>
                 </div>
 
-                <!-- Opponents Grid -->
                 <div class="lg:col-span-8 order-1 lg:order-2">
                     <div id="opponentsGrid" class="w-full"></div>
                 </div>
             </div>
 
-            <!-- Footer Chat & Controls -->
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-6 pb-6">
                 <div class="lg:col-span-8 glass-panel p-4 md:p-6 rounded-[2rem]">
                     <div id="clueLog" class="h-40 md:h-48 overflow-y-auto mb-4 p-3 bg-black/40 rounded-2xl border border-white/5 custom-scroll"></div>
