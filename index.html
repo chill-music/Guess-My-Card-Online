@@ -26,7 +26,7 @@
         let playerRole = null; 
         let currentUser = null;
         let lastLoadedImage = null; 
-        let isLocalPreviewOpen = false; // State for private preview
+        let isLocalPreviewOpen = false;
         const roomId = "global_stable_v3_final"; 
 
         const translations = {
@@ -36,13 +36,15 @@
                 p1: "Player 1", p2: "Player 2", p3: "Player 3", p4: "Player 4",
                 occupied: "(Occupied)", viewer: "Spectator Mode 👀",
                 myCard: "Your Secret Card", placeholderCard: "Word or Image...",
-                save: "Save", opCard: "Opponent",
+                save: "Save", opCard: "Player",
                 reveal: "Reveal Everything 🏁", exit: "Back to Lobby 🚪",
                 empty: "Waiting...", you: "You",
                 reset: "Restart Match 🔄", resetRoom: "Reset All",
                 showToOpponent: "Show Card 👀", hideFromOpponent: "Hide Card 🔒",
                 isImage: "Picked an Image 📷", isWord: "Picked a Word 📝",
-                connecting: "Connecting to Arena...", langBtn: "العربية"
+                connecting: "Connecting to Arena...", langBtn: "العربية",
+                send: "Send", spectatorView: "Spectator Mode 👀",
+                chatPlaceholder: "Enter guess..."
             },
             ar: {
                 title: "كارد<span class='text-indigo-500 animate-pulse'>X</span> الترا",
@@ -50,13 +52,15 @@
                 p1: "اللاعب 1", p2: "اللاعب 2", p3: "اللاعب 3", p4: "اللاعب 4",
                 occupied: "(محجوز)", viewer: "وضع المشاهدة 👀",
                 myCard: "كارتك السري", placeholderCard: "كلمة أو صورة...",
-                save: "حفظ", opCard: "الخصم",
+                save: "حفظ", opCard: "اللاعب",
                 reveal: "كشف الأوراق 🏁", exit: "خروج للرئيسية 🚪",
                 empty: "بانتظار الاختيار...", you: "أنت",
                 reset: "إعادة المباراة 🔄", resetRoom: "إعادة الكل",
                 showToOpponent: "إظهار الكارت 👀", hideFromOpponent: "إخفاء الكارت 🔒",
                 isImage: "اختار صورة 📷", isWord: "اختار كلمة 📝",
-                connecting: "جاري الاتصال بالساحة...", langBtn: "English"
+                connecting: "جاري الاتصال بالساحة...", langBtn: "English",
+                send: "إرسال", spectatorView: "وضع المشاهدة 👀",
+                chatPlaceholder: "اكتب توقعك هنا..."
             }
         };
 
@@ -76,6 +80,7 @@
                 if (el.tagName === 'INPUT') el.placeholder = t[key];
                 else el.innerHTML = t[key];
             });
+            updateSendButtonUI();
         }
 
         const initRoomListener = () => {
@@ -116,7 +121,27 @@
             document.getElementById('lobbySection').classList.add('hidden');
             document.getElementById('arenaSection').classList.remove('hidden');
             if (role === 'viewer') document.getElementById('mySecretBox').classList.add('hidden');
+            updateSendButtonUI();
         };
+
+        function updateSendButtonUI() {
+            const t = translations[currentLang];
+            const sendBtn = document.getElementById('sendClueBtn');
+            const clueInput = document.getElementById('clueInput');
+            if (playerRole === 'viewer') {
+                sendBtn.innerText = t.spectatorView;
+                sendBtn.classList.replace('bg-indigo-600', 'bg-slate-700');
+                sendBtn.disabled = true;
+                clueInput.disabled = true;
+                clueInput.placeholder = t.spectatorView;
+            } else {
+                sendBtn.innerText = t.send;
+                sendBtn.classList.replace('bg-slate-700', 'bg-indigo-600');
+                sendBtn.disabled = false;
+                clueInput.disabled = false;
+                clueInput.placeholder = t.chatPlaceholder;
+            }
+        }
 
         window.exitToLobby = async () => {
             if (playerRole && playerRole !== 'viewer') {
@@ -160,16 +185,14 @@
         function renderLocalCard(val) {
             const el = document.getElementById('myCardContent');
             if (val?.startsWith('data:image')) el.innerHTML = `<img src="${val}" class="w-full h-full object-contain rounded-2xl" />`;
-            else el.innerHTML = `<div class="flex items-center justify-center h-full p-4"><span class="text-2xl font-black text-slate-800 break-all uppercase">${val || ''}</span></div>`;
+            else el.innerHTML = `<div class="flex items-center justify-center h-full p-4 text-center"><span class="text-2xl font-black text-slate-800 break-all uppercase leading-tight">${val || ''}</span></div>`;
         }
 
-        // Feature: Toggle Private View (Only for you)
         window.toggleMyPrivateView = () => {
             isLocalPreviewOpen = !isLocalPreviewOpen;
             const cardInner = document.getElementById('myFlipCard');
             if (isLocalPreviewOpen) cardInner.classList.add('is-flipped');
             else {
-                // Only flip back if it's not revealed to the public
                 getDoc(doc(db, 'games', roomId)).then(snap => {
                     if (!snap.data()[`p${playerRole}Reveal`] && !snap.data().open) {
                         cardInner.classList.remove('is-flipped');
@@ -178,7 +201,6 @@
             }
         };
 
-        // Feature: Toggle Public Reveal (For everyone)
         window.toggleMyReveal = async () => {
             if (!playerRole || playerRole === 'viewer') return;
             const roomRef = doc(db, 'games', roomId);
@@ -196,7 +218,6 @@
                 const isRevealedToPublic = data[`p${playerRole}Reveal`] || false;
                 document.getElementById('revealToggle').innerText = isRevealedToPublic ? t.hideFromOpponent : t.showToOpponent;
                 
-                // Flip Logic: Flip if Publicly revealed OR if viewing locally OR game is over
                 if (data.open || isRevealedToPublic || isLocalPreviewOpen) {
                     document.getElementById('myFlipCard').classList.add('is-flipped');
                 } else {
@@ -211,9 +232,10 @@
             grid.innerHTML = '';
             const others = activePlayers.filter(id => id !== playerRole);
             
-            if (others.length === 1) grid.className = "grid grid-cols-1 max-w-lg mx-auto w-full gap-6";
-            else if (others.length === 2) grid.className = "grid grid-cols-1 md:grid-cols-2 w-full gap-6";
-            else grid.className = "grid grid-cols-2 md:grid-cols-3 w-full gap-4";
+            // Grid layout optimization
+            if (others.length === 1) grid.className = "grid grid-cols-1 max-w-sm mx-auto w-full gap-4";
+            else if (others.length === 2) grid.className = "grid grid-cols-2 w-full gap-3 md:gap-6";
+            else grid.className = "grid grid-cols-2 md:grid-cols-3 w-full gap-3 md:gap-6";
 
             others.forEach(i => {
                 const val = data[`p${i}`];
@@ -221,21 +243,21 @@
                 const isImg = val?.startsWith('data:image');
                 
                 grid.innerHTML += `
-                    <div class="glass-panel p-6 rounded-[2.5rem] flex flex-col items-center animate-in">
-                        <div class="flex items-center gap-2 mb-4 bg-black/30 px-4 py-1 rounded-full">
-                            <span class="text-[10px] font-black text-indigo-400 uppercase tracking-tighter">${t.opCard} ${i}</span>
-                            <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                    <div class="glass-panel p-4 md:p-6 rounded-[1.5rem] md:rounded-[2.5rem] flex flex-col items-center animate-in">
+                        <div class="flex items-center gap-1 md:gap-2 mb-2 md:mb-4 bg-black/30 px-3 py-1 rounded-full">
+                            <span class="text-[8px] md:text-[10px] font-black text-indigo-400 uppercase tracking-tighter">${t.opCard} ${i}</span>
+                            <span class="w-1.5 h-1.5 md:w-2 md:h-2 bg-green-500 rounded-full animate-pulse"></span>
                         </div>
-                        <div class="h-6 mb-4">
-                            <span class="text-[9px] font-bold text-slate-500 uppercase">${val ? (isImg ? t.isImage : t.isWord) : t.empty}</span>
+                        <div class="h-4 md:h-6 mb-2 md:mb-4">
+                            <span class="text-[7px] md:text-[9px] font-bold text-slate-500 uppercase">${val ? (isImg ? t.isImage : t.isWord) : t.empty}</span>
                         </div>
-                        <div class="perspective w-full aspect-[3/4] max-w-[240px]">
+                        <div class="perspective w-full aspect-[3/4] max-w-[180px] md:max-w-[240px]">
                             <div class="card-inner ${reveal ? 'is-flipped' : ''}">
-                                <div class="card-face card-front shadow-2xl bg-gradient-to-br from-indigo-900 to-slate-900 border border-white/10">
-                                    <span class="text-5xl opacity-20">🕵️‍♂️</span>
+                                <div class="card-face card-front shadow-xl bg-gradient-to-br from-indigo-900 to-slate-900 border border-white/10">
+                                    <span class="text-3xl md:text-5xl opacity-20">🕵️‍♂️</span>
                                 </div>
-                                <div class="card-face card-back overflow-hidden border-4 border-indigo-500 shadow-2xl">
-                                    ${reveal && val ? (isImg ? `<img src="${val}" class="w-full h-full object-contain p-2" />` : `<span class="text-center text-xl font-black text-slate-800 p-4 uppercase">${val}</span>`) : ''}
+                                <div class="card-face card-back overflow-hidden border-2 md:border-4 border-indigo-500 shadow-2xl">
+                                    ${reveal && val ? (isImg ? `<img src="${val}" class="w-full h-full object-contain p-1" />` : `<div class="p-2 text-center leading-tight"><span class="text-sm md:text-xl font-black text-slate-800 uppercase break-all">${val}</span></div>`) : ''}
                                 </div>
                             </div>
                         </div>
@@ -245,9 +267,9 @@
 
             const log = document.getElementById('clueLog');
             log.innerHTML = (data.chat || []).slice(-20).reverse().map(m => `
-                <div class="mb-2 p-3 rounded-2xl ${m.isCorrect ? 'bg-green-600 text-white w-full text-center font-black' : (m.sender === playerRole ? 'bg-indigo-600/40 ml-auto' : 'bg-white/5')} max-w-[85%] animate-in border border-white/5">
-                    <p class="text-[8px] opacity-50 uppercase font-black">${m.sender === 'viewer' ? 'Spectator' : t.opCard + ' ' + m.sender}</p>
-                    <p class="text-xs font-bold">${m.isCorrect ? '🎉 ' + m.text : m.text}</p>
+                <div class="mb-2 p-3 rounded-2xl ${m.isCorrect ? 'bg-green-600 text-white w-full text-center font-black' : (m.sender === playerRole ? 'bg-indigo-600/40 ml-auto' : 'bg-white/5')} max-w-[90%] animate-in border border-white/5">
+                    <p class="text-[8px] opacity-60 uppercase font-black mb-1">${m.sender === 'viewer' ? '👀 Spectator' : t.opCard + ' ' + m.sender}</p>
+                    <p class="text-xs font-bold leading-relaxed">${m.isCorrect ? '🎉 ' + m.text : m.text}</p>
                 </div>
             `).join('');
 
@@ -285,90 +307,84 @@
     </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700;800&family=Noto+Sans+Arabic:wght@400;700;900&display=swap');
-        body { background: #030712; color: #f8fafc; font-family: 'Plus Jakarta Sans', 'Noto Sans Arabic', sans-serif; overflow-x: hidden; }
+        body { background: #030712; color: #f8fafc; font-family: 'Plus Jakarta Sans', 'Noto Sans Arabic', sans-serif; overflow-x: hidden; -webkit-tap-highlight-color: transparent; }
         .glass-panel { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
         .perspective { perspective: 1200px; }
         .card-inner { transition: transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1); transform-style: preserve-3d; width: 100%; height: 100%; position: relative; }
         .is-flipped { transform: rotateY(180deg); }
-        .card-face { backface-visibility: hidden; position: absolute; width: 100%; height: 100%; border-radius: 2rem; display: flex; align-items: center; justify-content: center; }
+        .card-face { backface-visibility: hidden; position: absolute; width: 100%; height: 100%; border-radius: 1.5rem; display: flex; align-items: center; justify-content: center; }
+        @media (min-width: 768px) { .card-face { border-radius: 2rem; } }
         .card-back { transform: rotateY(180deg); background: #ffffff; color: #0f172a; }
         .card-front { background: linear-gradient(135deg, #1e1b4b, #0f172a); }
-        .animate-in { animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
-        @keyframes popIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+        .animate-in { animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.1) forwards; }
+        @keyframes popIn { from { opacity: 0; transform: translateY(10px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
         .hero-card { animation: float 5s ease-in-out infinite; transform-style: preserve-3d; }
-        @keyframes float { 0%, 100% { transform: translateY(0) rotateY(15deg); } 50% { transform: translateY(-25px) rotateY(-15deg); } }
+        @keyframes float { 0%, 100% { transform: translateY(0) rotateY(15deg); } 50% { transform: translateY(-15px) rotateY(-15deg); } }
         .custom-scroll::-webkit-scrollbar { width: 4px; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #6366f1; border-radius: 10px; }
-        
-        /* 3D Interactive Card Animation */
-        .card-inner:hover { transform: rotateY(10deg) rotateX(5deg); }
-        .is-flipped:hover { transform: rotateY(190deg) rotateX(5deg); }
+        .card-inner:active { transform: scale(0.95) rotateY(10deg); }
+        .is-flipped:active { transform: scale(0.95) rotateY(190deg); }
     </style>
 </head>
-<body class="p-4 md:p-8 min-h-screen">
+<body class="p-3 md:p-8 min-h-screen flex items-start justify-center">
     <div class="max-w-7xl mx-auto w-full">
-        <header class="flex justify-between items-center mb-10">
-            <h1 id="siteLogo" class="text-3xl font-black italic tracking-tighter">CARD<span class="text-indigo-500">X</span> ULTRA</h1>
-            <div class="flex items-center gap-4">
-                <button onclick="toggleLanguage()" data-t="langBtn" class="bg-white/5 border border-white/10 px-5 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all">العربية</button>
-                <button onclick="resetArena()" data-t="resetRoom" class="text-[9px] text-red-500/40 hover:text-red-500 font-black uppercase">Reset</button>
+        <header class="flex justify-between items-center mb-6 md:mb-10">
+            <h1 id="siteLogo" class="text-2xl md:text-3xl font-black italic tracking-tighter">CARD<span class="text-indigo-500">X</span> ULTRA</h1>
+            <div class="flex items-center gap-2 md:gap-4">
+                <button onclick="toggleLanguage()" data-t="langBtn" class="bg-white/5 border border-white/10 px-3 md:px-5 py-2 rounded-xl md:rounded-2xl text-[9px] md:text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all">العربية</button>
+                <button onclick="resetArena()" data-t="resetRoom" class="text-[8px] md:text-[9px] text-red-500/40 hover:text-red-500 font-black uppercase">Reset</button>
             </div>
         </header>
 
-        <div id="lobbySection" class="flex flex-col items-center py-10 animate-in">
-            <div class="perspective mb-16">
-                <div class="hero-card w-40 h-56 bg-gradient-to-br from-indigo-600 to-purple-800 rounded-[2.5rem] shadow-[0_30px_60px_rgba(79,70,229,0.4)] flex items-center justify-center border border-white/20">
-                    <span class="text-7xl">💎</span>
+        <div id="lobbySection" class="flex flex-col items-center py-6 md:py-10 animate-in">
+            <div class="perspective mb-10 md:mb-16">
+                <div class="hero-card w-32 h-44 md:w-40 md:h-56 bg-gradient-to-br from-indigo-600 to-purple-800 rounded-[2rem] md:rounded-[2.5rem] shadow-[0_20px_50px_rgba(79,70,229,0.3)] flex items-center justify-center border border-white/20">
+                    <span class="text-5xl md:text-7xl">💎</span>
                 </div>
             </div>
-            <div class="glass-panel p-10 md:p-16 rounded-[4rem] text-center w-full max-w-4xl">
-                <h2 data-t="title" class="text-5xl md:text-7xl font-black mb-4">CARD<span class="text-indigo-500">X</span> ULTRA</h2>
-                <p data-t="setupDesc" class="text-slate-500 mb-12 text-sm font-bold tracking-[0.3em] uppercase">The Ultimate Multi-Player Arena</p>
-                
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                    <button id="p1Btn" onclick="setupPlayer(1)" class="p-6 rounded-3xl bg-indigo-600 font-black">Player 1</button>
-                    <button id="p2Btn" onclick="setupPlayer(2)" class="p-6 rounded-3xl bg-purple-600 font-black">Player 2</button>
-                    <button id="p3Btn" onclick="setupPlayer(3)" class="p-6 rounded-3xl bg-indigo-600 font-black">Player 3</button>
-                    <button id="p4Btn" onclick="setupPlayer(4)" class="p-6 rounded-3xl bg-purple-600 font-black">Player 4</button>
+            <div class="glass-panel p-6 md:p-16 rounded-[2.5rem] md:rounded-[4rem] text-center w-full max-w-4xl">
+                <h2 data-t="title" class="text-3xl md:text-7xl font-black mb-3">CARD<span class="text-indigo-500">X</span> ULTRA</h2>
+                <p data-t="setupDesc" class="text-slate-500 mb-8 md:mb-12 text-[9px] md:text-sm font-bold tracking-[0.2em] md:tracking-[0.3em] uppercase">The Ultimate Multi-Player Arena</p>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
+                    <button id="p1Btn" onclick="setupPlayer(1)" class="p-4 md:p-6 rounded-2xl md:rounded-3xl bg-indigo-600 font-black text-xs md:text-base shadow-lg">Player 1</button>
+                    <button id="p2Btn" onclick="setupPlayer(2)" class="p-4 md:p-6 rounded-2xl md:rounded-3xl bg-purple-600 font-black text-xs md:text-base shadow-lg">Player 2</button>
+                    <button id="p3Btn" onclick="setupPlayer(3)" class="p-4 md:p-6 rounded-2xl md:rounded-3xl bg-indigo-600 font-black text-xs md:text-base shadow-lg">Player 3</button>
+                    <button id="p4Btn" onclick="setupPlayer(4)" class="p-4 md:p-6 rounded-2xl md:rounded-3xl bg-purple-600 font-black text-xs md:text-base shadow-lg">Player 4</button>
                 </div>
-                
-                <button onclick="setupPlayer('viewer')" data-t="viewer" class="w-full bg-slate-800/40 p-5 rounded-3xl font-black text-slate-400 hover:bg-slate-800 transition-all border border-white/5">Spectator Mode 👀</button>
+                <button onclick="setupPlayer('viewer')" data-t="viewer" class="w-full bg-slate-800/40 p-4 md:p-5 rounded-2xl md:rounded-3xl font-black text-slate-400 hover:bg-slate-800 transition-all border border-white/5 text-xs md:text-base">Spectator Mode 👀</button>
             </div>
         </div>
 
-        <div id="arenaSection" class="hidden space-y-8 animate-in">
-            <div class="flex justify-between items-center">
-                <button onclick="exitToLobby()" data-t="exit" class="bg-red-500/10 text-red-500 text-[10px] font-black px-8 py-4 rounded-3xl border border-red-500/20 uppercase hover:bg-red-500/20 transition-all">Back to Lobby 🚪</button>
-                <div class="flex items-center gap-2">
-                    <span class="w-2 h-2 bg-green-500 rounded-full animate-ping"></span>
-                    <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Live Arena</span>
+        <div id="arenaSection" class="hidden space-y-4 md:space-y-8 animate-in">
+            <div class="flex justify-between items-center bg-black/20 p-2 md:p-4 rounded-[2rem] border border-white/5">
+                <button onclick="exitToLobby()" data-t="exit" class="bg-red-500/10 text-red-500 text-[8px] md:text-[10px] font-black px-4 md:px-8 py-2 md:py-4 rounded-xl md:rounded-3xl border border-red-500/20 uppercase hover:bg-red-500/20 transition-all">Back to Lobby 🚪</button>
+                <div class="flex items-center gap-2 pr-2">
+                    <span class="w-1.5 h-1.5 md:w-2 md:h-2 bg-green-500 rounded-full animate-ping"></span>
+                    <span class="text-[8px] md:text-[10px] font-black text-slate-500 uppercase tracking-widest">Live Arena</span>
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-                <div id="mySecretBox" class="lg:col-span-4 glass-panel p-8 rounded-[3rem] border-l-8 border-indigo-600 order-2 lg:order-1">
-                    <div class="flex justify-between items-center mb-8">
-                        <h3 data-t="myCard" class="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Your Secret</h3>
-                        <button id="revealToggle" onclick="toggleMyReveal()" class="bg-indigo-600/20 text-indigo-400 text-[9px] px-5 py-2 rounded-2xl font-black uppercase">Show to Enemy 👀</button>
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-8 items-start">
+                <div id="mySecretBox" class="lg:col-span-4 glass-panel p-5 md:p-8 rounded-[2rem] md:rounded-[3rem] border-l-4 md:border-l-8 border-indigo-600 order-2 lg:order-1">
+                    <div class="flex justify-between items-center mb-4 md:mb-8">
+                        <h3 data-t="myCard" class="text-[9px] md:text-[10px] font-black text-indigo-400 uppercase tracking-widest">Your Secret</h3>
+                        <button id="revealToggle" onclick="toggleMyReveal()" class="bg-indigo-600/20 text-indigo-400 text-[8px] md:text-[9px] px-3 md:px-5 py-1.5 md:py-2 rounded-xl md:rounded-2xl font-black uppercase transition-all active:scale-95">Show to Enemy 👀</button>
                     </div>
-                    
-                    <div class="flex gap-2 mb-8">
-                        <input id="cardInput" data-t="placeholderCard" class="flex-1 bg-black/40 text-sm p-4 rounded-2xl border border-white/5 outline-none focus:border-indigo-500">
-                        <button onclick="saveTextCard()" data-t="save" class="bg-indigo-600 px-6 rounded-2xl text-[10px] font-black">SAVE</button>
-                        <button onclick="document.getElementById('file').click()" class="bg-slate-800 px-4 rounded-2xl text-xl">📷</button>
+                    <div class="flex gap-2 mb-4 md:mb-8">
+                        <input id="cardInput" data-t="placeholderCard" class="flex-1 bg-black/40 text-xs md:text-sm p-3 md:p-4 rounded-xl md:rounded-2xl border border-white/5 outline-none focus:border-indigo-500 transition-colors">
+                        <button onclick="saveTextCard()" data-t="save" class="bg-indigo-600 px-4 md:px-6 rounded-xl md:rounded-2xl text-[9px] md:text-[10px] font-black shadow-lg transition-all active:scale-90">SAVE</button>
+                        <button onclick="document.getElementById('file').click()" class="bg-slate-800 px-3 md:px-4 rounded-xl md:rounded-2xl text-lg md:text-xl shadow-lg transition-all active:scale-90">📷</button>
                         <input type="file" id="file" class="hidden" accept="image/*" onchange="uploadImage(event)">
                     </div>
-
-                    <div class="perspective w-full aspect-[3/4] max-w-[240px] mx-auto">
-                        <!-- Private View Toggle by Clicking the card -->
+                    <div class="perspective w-full aspect-[3/4] max-w-[160px] md:max-w-[240px] mx-auto">
                         <div id="myFlipCard" class="card-inner cursor-pointer" onclick="toggleMyPrivateView()">
-                            <div class="card-face card-front border-2 border-indigo-500/30">
-                                <div class="flex flex-col items-center">
-                                    <span class="text-6xl filter grayscale opacity-20 mb-4">🃏</span>
-                                    <span class="text-[8px] font-black text-indigo-400/40 uppercase tracking-widest">Click to see for yourself</span>
+                            <div class="card-face card-front border border-indigo-500/30">
+                                <div class="flex flex-col items-center p-4 text-center">
+                                    <span class="text-4xl md:text-6xl filter grayscale opacity-20 mb-3 md:mb-4">🃏</span>
+                                    <span class="text-[7px] md:text-[8px] font-black text-indigo-400/40 uppercase tracking-widest">Tap to view your card</span>
                                 </div>
                             </div>
-                            <div id="myCardContent" class="card-face card-back overflow-hidden border-4 border-indigo-600 shadow-2xl"></div>
+                            <div id="myCardContent" class="card-face card-back overflow-hidden border-2 md:border-4 border-indigo-600 shadow-2xl"></div>
                         </div>
                     </div>
                 </div>
@@ -378,19 +394,18 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                <div class="lg:col-span-8 glass-panel p-8 rounded-[3rem]">
-                    <h3 class="text-[10px] font-black mb-6 text-slate-500 uppercase tracking-widest">Clues & Chat</h3>
-                    <div id="clueLog" class="h-60 overflow-y-auto mb-6 p-6 bg-black/40 rounded-[2rem] flex flex-col border border-white/5 custom-scroll"></div>
-                    <div class="flex gap-4">
-                        <input id="clueInput" data-t="chatPlaceholder" class="flex-1 bg-black/40 p-5 rounded-2xl text-sm border border-white/5 outline-none focus:border-indigo-500" onkeypress="if(event.key==='Enter') sendClue()">
-                        <button onclick="sendClue()" data-t="send" class="bg-indigo-600 px-10 rounded-2xl text-xs font-black hover:bg-indigo-500 transition-all">SEND</button>
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-8 pb-10">
+                <div class="lg:col-span-8 glass-panel p-5 md:p-8 rounded-[2rem] md:rounded-[3rem]">
+                    <h3 class="text-[9px] md:text-[10px] font-black mb-4 md:mb-6 text-slate-500 uppercase tracking-widest">Clues & Live Chat</h3>
+                    <div id="clueLog" class="h-44 md:h-60 overflow-y-auto mb-4 md:mb-6 p-4 md:p-6 bg-black/40 rounded-[1.5rem] md:rounded-[2rem] flex flex-col border border-white/5 custom-scroll"></div>
+                    <div class="flex flex-col md:flex-row gap-2 md:gap-4">
+                        <input id="clueInput" data-t="chatPlaceholder" class="flex-1 bg-black/40 p-3 md:p-5 rounded-xl md:rounded-2xl text-xs md:text-sm border border-white/5 outline-none focus:border-indigo-500 transition-colors" onkeypress="if(event.key==='Enter') sendClue()">
+                        <button id="sendClueBtn" onclick="sendClue()" data-t="send" class="bg-indigo-600 px-6 md:px-10 py-3 md:py-0 rounded-xl md:rounded-2xl text-[10px] md:text-xs font-black hover:bg-indigo-500 transition-all shadow-xl active:scale-95">SEND</button>
                     </div>
                 </div>
-                
-                <div class="lg:col-span-4 flex flex-col gap-4">
-                    <button id="revealBtn" onclick="revealGame()" data-t="reveal" class="h-full glass-panel p-10 rounded-[3rem] text-red-500 text-xs font-black uppercase tracking-[0.2em] hover:bg-red-500/10 transition-all border-dashed border-2 border-red-500/30">Reveal All 🏁</button>
-                    <button id="resetBtn" onclick="resetArena()" data-t="reset" class="hidden h-full rounded-[3rem] bg-green-600 text-white font-black text-2xl shadow-[0_20px_40px_rgba(22,163,74,0.3)] hover:scale-105 active:scale-95 transition-all">RESTART 🔄</button>
+                <div class="lg:col-span-4 flex flex-col gap-3 md:gap-4">
+                    <button id="revealBtn" onclick="revealGame()" data-t="reveal" class="h-full glass-panel p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] text-red-500 text-[10px] md:text-xs font-black uppercase tracking-[0.2em] hover:bg-red-500/10 transition-all border-dashed border-2 border-red-500/30">Reveal All 🏁</button>
+                    <button id="resetBtn" onclick="resetArena()" data-t="reset" class="hidden h-full rounded-[2rem] md:rounded-[3rem] bg-green-600 text-white font-black text-xl md:text-2xl shadow-[0_20px_40px_rgba(22,163,74,0.3)] hover:scale-105 active:scale-95 transition-all">RESTART 🔄</button>
                 </div>
             </div>
         </div>
