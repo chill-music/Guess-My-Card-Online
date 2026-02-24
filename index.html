@@ -27,7 +27,7 @@
         let playerRole = null; 
         let currentUser = null;
         let lastLoadedImage = null; 
-        let isLocalPreviewOpen = false; // التحكم في الرؤية الشخصية فقط
+        let isLocalPreviewOpen = false; 
         const roomId = "global_stable_v4_pro"; 
 
         const translations = {
@@ -242,7 +242,6 @@
             await updateDoc(doc(db, 'games', roomId), { [`p${playerRole}Reveal`]: !current });
         };
 
-        // دالة مضافة للتعامل مع النقر على الكارت الشخصي (رؤية محلية فقط)
         window.handleCardClick = async () => {
             isLocalPreviewOpen = !isLocalPreviewOpen;
             const snap = await getDoc(doc(db, 'games', roomId));
@@ -251,6 +250,11 @@
 
         function updateGameArena(data) {
             const t = translations[currentLang];
+            const playerNames = [];
+            for(let i=1; i<=4; i++) {
+                if(data[`p${i}Name`]) playerNames.push(data[`p${i}Name`]);
+            }
+
             if (playerRole !== 'viewer') {
                 const val = lastLoadedImage || data[`p${playerRole}`];
                 const el = document.getElementById('myCardContent');
@@ -270,7 +274,6 @@
                 const isRevealedToPublic = data[`p${playerRole}Reveal`] || false;
                 document.getElementById('revealToggle').innerText = isRevealedToPublic ? t.hideFromOpponent : t.showToOpponent;
                 
-                // إضافة isLocalPreviewOpen هنا للسماح برؤية الكارت عند الضغط عليه محلياً
                 if (data.open || isRevealedToPublic || isLocalPreviewOpen) {
                     document.getElementById('myFlipCard').classList.add('is-flipped');
                 } else {
@@ -307,13 +310,33 @@
                 `;
             }
 
+            // --- Updated Chat UI with Tagging ---
             const log = document.getElementById('clueLog');
-            log.innerHTML = (data.chat || []).slice(-30).reverse().map(m => `
-                <div class="mb-2 p-3 rounded-2xl ${m.isCorrect ? 'bg-green-600 text-white w-full text-center font-black animate-bounce shadow-lg shadow-green-500/20' : (m.sender === playerRole ? 'bg-indigo-600/40 ml-auto' : 'bg-white/5')} max-w-[90%] border border-white/5">
-                    <p class="text-[8px] opacity-60 uppercase font-black mb-1">${m.senderName || 'Anonymous'}</p>
-                    <p class="text-xs font-bold leading-relaxed">${m.text}</p>
-                </div>
-            `).join('');
+            log.innerHTML = (data.chat || []).slice(-30).reverse().map(m => {
+                let msgText = m.text;
+                // Highlight player names (Tagging)
+                playerNames.forEach(name => {
+                    if (name.length > 2) {
+                        const regex = new RegExp(`(${name})`, 'gi');
+                        msgText = msgText.replace(regex, `<span class="bg-indigo-500/30 text-indigo-300 px-1.5 py-0.5 rounded-md border border-indigo-500/20">@$1</span>`);
+                    }
+                });
+
+                const isMe = m.sender === playerRole;
+                const bubbleClass = m.isCorrect 
+                    ? 'bg-gradient-to-br from-green-500 to-emerald-700 text-white w-full text-center font-black animate-bounce shadow-lg shadow-green-500/20 border-green-400/30' 
+                    : (isMe ? 'bg-indigo-600/60 ml-auto border-indigo-400/20' : 'bg-white/5 border-white/10');
+
+                return `
+                    <div class="mb-3 p-3.5 rounded-[1.5rem] ${bubbleClass} max-w-[85%] border transition-all hover:scale-[1.02]">
+                        <div class="flex justify-between items-center mb-1.5">
+                            <p class="text-[9px] opacity-70 uppercase font-black tracking-tighter">${m.senderName || 'Anonymous'}</p>
+                            ${m.isCorrect ? '<span class="text-[9px] bg-white/20 px-2 py-0.5 rounded-full">CORRECT</span>' : ''}
+                        </div>
+                        <p class="text-xs font-bold leading-relaxed break-words">${msgText}</p>
+                    </div>
+                `;
+            }).join('');
 
             document.getElementById('revealBtn').style.display = data.open ? 'none' : 'block';
             document.getElementById('resetBtn').style.display = data.open ? 'block' : 'none';
@@ -560,7 +583,6 @@
                         <input type="file" id="file" class="hidden" accept="image/*" onchange="uploadImage(event)">
                     </div>
                     <div class="perspective w-full aspect-[3/4] max-w-[220px] mx-auto">
-                        <!-- تم تعديل الـ onClick هنا -->
                         <div id="myFlipCard" class="card-inner cursor-pointer" onclick="handleCardClick()">
                             <div class="card-face card-front border border-white/10 shadow-2xl">
                                 <span class="text-5xl opacity-20 filter grayscale">🃏</span>
@@ -581,29 +603,30 @@
                 <div class="lg:col-span-8 theme-panel p-6 rounded-[3rem] flex flex-col shadow-2xl">
                     <div id="clueLog" class="h-56 overflow-y-auto mb-4 p-5 bg-black/40 rounded-[2rem] border border-white/5 custom-scroll shadow-inner font-medium"></div>
                     <div class="relative flex gap-3">
-                        <button onclick="toggleEmojiPicker()" class="bg-white/5 border border-white/10 w-14 rounded-2xl text-2xl flex items-center justify-center hover:bg-white/10 transition-all active:scale-90">😊</button>
-                        <input id="clueInput" data-t="chatPlaceholder" class="flex-1 bg-black/40 p-5 rounded-2xl text-sm border border-white/5 outline-none focus:border-indigo-500 shadow-inner font-bold">
-                        <button id="sendClueBtn" onclick="sendClue()" data-t="send" class="bg-indigo-600 px-8 rounded-2xl font-black text-xs text-white shadow-xl hover:bg-indigo-500 active:scale-95 transition-all uppercase tracking-widest">SEND</button>
+                        <button onclick="toggleEmojiPicker()" class="bg-white/5 border border-white/10 w-14 rounded-2xl text-2xl flex items-center justify-center hover:bg-white/10 transition-all">😊</button>
+                        <input id="clueInput" data-t="chatPlaceholder" class="flex-1 bg-black/40 p-4 rounded-2xl border border-white/10 outline-none focus:border-indigo-500 font-bold text-xs shadow-inner" onkeypress="if(event.key === 'Enter') sendClue()">
+                        <button id="sendClueBtn" onclick="sendClue()" data-t="send" class="bg-indigo-600 px-8 rounded-2xl font-black text-xs text-white shadow-lg shadow-indigo-500/30 hover:bg-indigo-500 transition-all">SEND</button>
                         
-                        <!-- Emoji Picker -->
-                        <div id="emojiPicker" class="hidden absolute bottom-full left-0 mb-4 theme-panel p-4 rounded-3xl grid grid-cols-5 gap-2 border border-white/10 shadow-2xl animate-in">
-                            <button onclick="addEmoji('🔥')" class="text-2xl hover:scale-125 transition-transform">🔥</button>
-                            <button onclick="addEmoji('⭐')" class="text-2xl hover:scale-125 transition-transform">⭐</button>
-                            <button onclick="addEmoji('💎')" class="text-2xl hover:scale-125 transition-transform">💎</button>
-                            <button onclick="addEmoji('👑')" class="text-2xl hover:scale-125 transition-transform">👑</button>
-                            <button onclick="addEmoji('🚀')" class="text-2xl hover:scale-125 transition-transform">🚀</button>
-                            <button onclick="addEmoji('🎭')" class="text-2xl hover:scale-125 transition-transform">🎭</button>
-                            <button onclick="addEmoji('⚔️')" class="text-2xl hover:scale-125 transition-transform">⚔️</button>
-                            <button onclick="addEmoji('💡')" class="text-2xl hover:scale-125 transition-transform">💡</button>
-                            <button onclick="addEmoji('🍎')" class="text-2xl hover:scale-125 transition-transform">🍎</button>
-                            <button onclick="addEmoji('🦁')" class="text-2xl hover:scale-125 transition-transform">🦁</button>
+                        <div id="emojiPicker" class="hidden absolute bottom-20 left-0 bg-slate-900 p-4 rounded-2xl grid grid-cols-6 gap-2 border border-white/10 shadow-2xl z-50">
+                            <button onclick="addEmoji('🔥')" class="text-xl">🔥</button>
+                            <button onclick="addEmoji('👀')" class="text-xl">👀</button>
+                            <button onclick="addEmoji('🤡')" class="text-xl">🤡</button>
+                            <button onclick="addEmoji('😂')" class="text-xl">😂</button>
+                            <button onclick="addEmoji('🤔')" class="text-xl">🤔</button>
+                            <button onclick="addEmoji('✅')" class="text-xl">✅</button>
+                            <button onclick="addEmoji('❌')" class="text-xl">❌</button>
+                            <button onclick="addEmoji('💀')" class="text-xl">💀</button>
+                            <button onclick="addEmoji('🤖')" class="text-xl">🤖</button>
+                            <button onclick="addEmoji('✨')" class="text-xl">✨</button>
+                            <button onclick="addEmoji('🤫')" class="text-xl">🤫</button>
+                            <button onclick="addEmoji('🚩')" class="text-xl">🚩</button>
                         </div>
                     </div>
                 </div>
-
+                
                 <div class="lg:col-span-4 flex flex-col gap-4">
-                    <button id="revealBtn" onclick="revealGame()" data-t="reveal" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 p-6 rounded-3xl font-black text-white shadow-2xl hover:scale-[1.02] active:scale-95 transition-all text-sm uppercase tracking-[0.2em] border-b-4 border-black/20">Reveal All 🏁</button>
-                    <button id="resetBtn" onclick="resetArena()" data-t="reset" class="hidden w-full bg-green-600 p-6 rounded-3xl font-black text-white shadow-2xl hover:scale-[1.02] active:scale-95 transition-all text-sm uppercase tracking-[0.2em] border-b-4 border-black/20">NEW ROUND 🔄</button>
+                    <button id="revealBtn" onclick="revealGame()" data-t="reveal" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 p-6 rounded-[2rem] font-black text-white shadow-xl hover:scale-[1.02] active:scale-95 transition-all text-xs tracking-widest border-b-4 border-indigo-800">REVEAL ALL 🏁</button>
+                    <button id="resetBtn" onclick="resetArena()" data-t="reset" class="w-full bg-emerald-600 p-6 rounded-[2rem] font-black text-white shadow-xl hover:scale-[1.02] active:scale-95 transition-all text-xs tracking-widest border-b-4 border-emerald-800" style="display:none;">NEW ROUND 🔄</button>
                 </div>
             </div>
         </div>
