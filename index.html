@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CardX Ultra - Pro Edition</title>
+    <!-- Favicon (أيقونة المتصفح) -->
+    <link rel="icon" href="https://fav.farm/🃏" />
     <script src="https://cdn.tailwindcss.com"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -114,17 +116,33 @@
             }
         }
 
+        // تحسين ميزة حفظ الاسم في السيرفر والذاكرة المحلية
         window.updateStoredName = async () => {
             const name = document.getElementById('userNameInput').value.trim();
-            if (!name || !playerRole || playerRole === 'viewer') return;
-            await updateDoc(doc(db, 'games', roomId), { 
-                [`p${playerRole}Name`]: name 
-            });
+            if (!name) return;
+            
+            // حفظ في الذاكرة المحلية للمتصفح حتى لا يضيع عند الريفرش
+            localStorage.setItem('cardx_username', name);
+
+            if (playerRole && playerRole !== 'viewer') {
+                await updateDoc(doc(db, 'games', roomId), { 
+                    [`p${playerRole}Name`]: name 
+                });
+            }
+            
+            // إشعار بصري بسيط للحفظ
+            const saveBtn = document.querySelector('[onclick="updateStoredName()"]');
+            const originalText = saveBtn.innerText;
+            saveBtn.innerText = "✓ SAVED";
+            setTimeout(() => saveBtn.innerText = originalText, 2000);
         };
 
         window.setupPlayer = async (role) => {
             if (!currentUser) return;
-            const userName = document.getElementById('userNameInput').value.trim() || `Player ${role}`;
+            // استرجاع الاسم المحفوظ أو الافتراضي
+            const savedName = localStorage.getItem('cardx_username');
+            const userName = document.getElementById('userNameInput').value.trim() || savedName || `Player ${role}`;
+            
             playerRole = role;
             if (role !== 'viewer') {
                 await updateDoc(doc(db, 'games', roomId), { 
@@ -313,7 +331,13 @@
         window.resetArena = () => setDoc(doc(db, 'games', roomId), { p1:"", p2:"", p3:"", p4:"", chat:[], open:false, p1Id:"", p2Id:"", p3Id:"", p4Id:"", p1Reveal:false, p2Reveal:false, p3Reveal:false, p4Reveal:false, p1Name:"", p2Name:"", p3Name:"", p4Name:"" }).then(() => location.reload());
 
         onAuthStateChanged(auth, async (user) => {
-            if (user) { currentUser = user; initRoomListener(); }
+            if (user) { 
+                currentUser = user; 
+                initRoomListener();
+                // استرجاع الاسم عند تحميل الصفحة
+                const saved = localStorage.getItem('cardx_username');
+                if(saved) document.getElementById('userNameInput').value = saved;
+            }
             else { await signInAnonymously(auth); }
         });
 
@@ -324,7 +348,6 @@
         body { background: #030712; color: #f8fafc; font-family: 'Plus Jakarta Sans', 'Noto Sans Arabic', sans-serif; overflow-x: hidden; -webkit-tap-highlight-color: transparent; }
         .glass-panel { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
         
-        /* Animated Logo Text */
         .logo-animate {
             background: linear-gradient(to right, #6366f1, #a855f7, #6366f1);
             background-size: 200% auto;
