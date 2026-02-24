@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CardX Ultra - Pro Edition</title>
-    <!-- Favicon (أيقونة المتصفح) -->
     <link rel="icon" href="https://fav.farm/🃏" />
     <script src="https://cdn.tailwindcss.com"></script>
     <script type="module">
@@ -29,7 +28,7 @@
         let currentUser = null;
         let lastLoadedImage = null; 
         let isLocalPreviewOpen = false;
-        const roomId = "global_stable_v3_final"; 
+        const roomId = "global_stable_v4_pro"; 
 
         const translations = {
             en: {
@@ -41,7 +40,7 @@
                 myCard: "Your Secret Card", placeholderCard: "Word or Image...",
                 save: "Save", reveal: "Reveal Everything 🏁", exit: "Back to Lobby 🚪",
                 empty: "Waiting...", you: "You",
-                reset: "Restart Match 🔄", resetRoom: "Reset All",
+                reset: "New Round 🔄", resetRoom: "Reset All",
                 showToOpponent: "Show Card 👀", hideFromOpponent: "Hide Card 🔒",
                 isImage: "Picked an Image 📷", isWord: "Picked a Word 📝",
                 connecting: "Connecting...", langBtn: "العربية",
@@ -58,7 +57,7 @@
                 myCard: "كارتك السري", placeholderCard: "كلمة أو صورة...",
                 save: "حفظ", reveal: "كشف الأوراق 🏁", exit: "خروج للرئيسية 🚪",
                 empty: "بانتظار الاختيار...", you: "أنت",
-                reset: "إعادة المباراة 🔄", resetRoom: "إعادة الكل",
+                reset: "جولة جديدة 🔄", resetRoom: "إعادة الكل",
                 showToOpponent: "إظهار الكارت 👀", hideFromOpponent: "إخفاء الكارت 🔒",
                 isImage: "اختار صورة 📷", isWord: "اختار كلمة 📝",
                 connecting: "جاري الاتصال...", langBtn: "English",
@@ -100,6 +99,17 @@
             });
         };
 
+        // مسح بيانات اللاعب عند الخروج أو التحديث لضمان التحديث الفوري
+        window.addEventListener('beforeunload', async () => {
+            if (playerRole && playerRole !== 'viewer') {
+                await updateDoc(doc(db, 'games', roomId), { 
+                    [`p${playerRole}`]: "",
+                    [`p${playerRole}Id`]: "",
+                    [`p${playerRole}Reveal`]: false
+                });
+            }
+        });
+
         function updateLobbyUI(data) {
             const t = translations[currentLang];
             for(let i=1; i<=4; i++) {
@@ -116,33 +126,22 @@
             }
         }
 
-        // تحسين ميزة حفظ الاسم في السيرفر والذاكرة المحلية
         window.updateStoredName = async () => {
             const name = document.getElementById('userNameInput').value.trim();
             if (!name) return;
-            
-            // حفظ في الذاكرة المحلية للمتصفح حتى لا يضيع عند الريفرش
             localStorage.setItem('cardx_username', name);
-
             if (playerRole && playerRole !== 'viewer') {
-                await updateDoc(doc(db, 'games', roomId), { 
-                    [`p${playerRole}Name`]: name 
-                });
+                await updateDoc(doc(db, 'games', roomId), { [`p${playerRole}Name`]: name });
             }
-            
-            // إشعار بصري بسيط للحفظ
             const saveBtn = document.querySelector('[onclick="updateStoredName()"]');
-            const originalText = saveBtn.innerText;
             saveBtn.innerText = "✓ SAVED";
-            setTimeout(() => saveBtn.innerText = originalText, 2000);
+            setTimeout(() => saveBtn.innerText = "SAVE NAME", 2000);
         };
 
         window.setupPlayer = async (role) => {
             if (!currentUser) return;
-            // استرجاع الاسم المحفوظ أو الافتراضي
             const savedName = localStorage.getItem('cardx_username');
             const userName = document.getElementById('userNameInput').value.trim() || savedName || `Player ${role}`;
-            
             playerRole = role;
             if (role !== 'viewer') {
                 await updateDoc(doc(db, 'games', roomId), { 
@@ -156,28 +155,9 @@
             updateSendButtonUI();
         };
 
-        function updateSendButtonUI() {
-            const t = translations[currentLang];
-            const sendBtn = document.getElementById('sendClueBtn');
-            const clueInput = document.getElementById('clueInput');
-            if (playerRole === 'viewer') {
-                sendBtn.innerText = t.spectatorView;
-                sendBtn.classList.replace('bg-indigo-600', 'bg-slate-700');
-                sendBtn.disabled = true;
-                clueInput.disabled = true;
-                clueInput.placeholder = t.spectatorView;
-            } else {
-                sendBtn.innerText = t.send;
-                sendBtn.classList.replace('bg-slate-700', 'bg-indigo-600');
-                sendBtn.disabled = false;
-                clueInput.disabled = false;
-                clueInput.placeholder = t.chatPlaceholder;
-            }
-        }
-
         window.exitToLobby = async () => {
             if (playerRole && playerRole !== 'viewer') {
-                await updateDoc(doc(db, 'games', roomId), { [`p${playerRole}Id`]: "" });
+                await updateDoc(doc(db, 'games', roomId), { [`p${playerRole}Id`]: "", [`p${playerRole}`]: "" });
             }
             playerRole = null;
             document.getElementById('arenaSection').classList.add('hidden');
@@ -198,7 +178,6 @@
                     canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
                     const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
                     lastLoadedImage = dataUrl;
-                    renderLocalCard(dataUrl);
                     updateDoc(doc(db, 'games', roomId), { [`p${playerRole}`]: dataUrl });
                 };
                 img.src = event.target.result;
@@ -214,39 +193,27 @@
             document.getElementById('cardInput').value = "";
         };
 
-        function renderLocalCard(val) {
-            const el = document.getElementById('myCardContent');
-            if (val?.startsWith('data:image')) el.innerHTML = `<img src="${val}" class="w-full h-full object-contain rounded-2xl" />`;
-            else el.innerHTML = `<div class="flex items-center justify-center h-full p-4 text-center"><span class="text-2xl font-black text-slate-800 break-all uppercase leading-tight">${val || ''}</span></div>`;
-        }
-
-        window.toggleMyPrivateView = () => {
-            isLocalPreviewOpen = !isLocalPreviewOpen;
-            const cardInner = document.getElementById('myFlipCard');
-            if (isLocalPreviewOpen) cardInner.classList.add('is-flipped');
-            else {
-                getDoc(doc(db, 'games', roomId)).then(snap => {
-                    if (!snap.data()[`p${playerRole}Reveal`] && !snap.data().open) {
-                        cardInner.classList.remove('is-flipped');
-                    }
-                });
-            }
+        // ميزة الإيموجي في الشات
+        window.toggleEmojiPicker = () => {
+            const picker = document.getElementById('emojiPicker');
+            picker.classList.toggle('hidden');
         };
 
-        window.toggleMyReveal = async () => {
-            if (!playerRole || playerRole === 'viewer') return;
-            const roomRef = doc(db, 'games', roomId);
-            const snap = await getDoc(roomRef);
-            if (snap.exists()) {
-                const currentState = snap.data()[`p${playerRole}Reveal`] || false;
-                await updateDoc(roomRef, { [`p${playerRole}Reveal`]: !currentState });
-            }
+        window.addEmoji = (emoji) => {
+            const input = document.getElementById('clueInput');
+            input.value += emoji;
+            input.focus();
+            toggleEmojiPicker();
         };
 
         function updateGameArena(data) {
             const t = translations[currentLang];
             if (playerRole !== 'viewer') {
-                renderLocalCard(lastLoadedImage || data[`p${playerRole}`]);
+                const val = lastLoadedImage || data[`p${playerRole}`];
+                const el = document.getElementById('myCardContent');
+                if (val?.startsWith('data:image')) el.innerHTML = `<img src="${val}" class="w-full h-full object-contain" />`;
+                else el.innerHTML = `<div class="flex items-center justify-center h-full p-4 text-center"><span class="text-2xl font-black text-slate-800 break-all uppercase">${val || ''}</span></div>`;
+
                 const isRevealedToPublic = data[`p${playerRole}Reveal`] || false;
                 document.getElementById('revealToggle').innerText = isRevealedToPublic ? t.hideFromOpponent : t.showToOpponent;
                 
@@ -257,51 +224,40 @@
                 }
             }
 
-            const activePlayers = [];
-            for(let i=1; i<=4; i++) if (data[`p${i}Id`]) activePlayers.push(i);
-
             const grid = document.getElementById('opponentsGrid');
             grid.innerHTML = '';
-            const others = activePlayers.filter(id => id !== playerRole);
-            
-            grid.className = "grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6 items-stretch";
-
-            others.forEach(i => {
+            for(let i=1; i<=4; i++) {
+                if (i === playerRole || !data[`p${i}Id`]) continue;
                 const val = data[`p${i}`];
                 const reveal = data[`p${i}Reveal`] || data.open;
                 const isImg = val?.startsWith('data:image');
-                const pName = data[`p${i}Name`] || `${t.opCard} ${i}`;
+                const pName = data[`p${i}Name`] || `Player ${i}`;
                 
                 grid.innerHTML += `
-                    <div class="glass-panel p-3 md:p-6 rounded-[1.5rem] md:rounded-[2.5rem] flex flex-col items-center animate-in justify-between border-b-4 border-indigo-500/20">
-                        <div class="w-full text-center">
-                            <div class="inline-flex items-center gap-2 mb-2 bg-black/30 px-3 py-1 rounded-full">
-                                <span class="text-[10px] md:text-xs font-black text-indigo-400 uppercase truncate max-w-[80px]">${pName}</span>
-                                <span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
-                            </div>
-                            <div class="h-4 md:h-6 mb-2">
-                                <span class="text-[8px] md:text-[10px] font-bold text-slate-500 uppercase">${val ? (isImg ? t.isImage : t.isWord) : t.empty}</span>
-                            </div>
+                    <div class="glass-panel p-4 rounded-[2rem] flex flex-col items-center animate-in">
+                        <div class="mb-2 bg-black/30 px-3 py-1 rounded-full flex items-center gap-2">
+                             <span class="text-[10px] font-black text-indigo-400 uppercase">${pName}</span>
+                             <span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
                         </div>
-                        <div class="perspective w-full aspect-[3/4] max-w-[140px] md:max-w-[200px]">
+                        <div class="perspective w-full aspect-[3/4] max-w-[160px]">
                             <div class="card-inner ${reveal ? 'is-flipped' : ''}">
-                                <div class="card-face card-front shadow-xl bg-gradient-to-br from-indigo-900 to-slate-900 border border-white/10">
-                                    <span class="text-3xl md:text-5xl opacity-20">🕵️‍♂️</span>
+                                <div class="card-face card-front shadow-xl bg-slate-900 border border-white/10">
+                                    <span class="text-4xl opacity-20">🕵️‍♂️</span>
                                 </div>
-                                <div class="card-face card-back overflow-hidden border-2 md:border-4 border-indigo-500 shadow-2xl">
-                                    ${reveal && val ? (isImg ? `<img src="${val}" class="w-full h-full object-contain p-1" />` : `<div class="p-2 text-center leading-tight flex items-center justify-center h-full"><span class="text-xs md:text-xl font-black text-slate-800 uppercase break-all">${val}</span></div>`) : ''}
+                                <div class="card-face card-back overflow-hidden border-4 border-indigo-500 shadow-2xl">
+                                    ${reveal && val ? (isImg ? `<img src="${val}" class="w-full h-full object-contain p-1" />` : `<div class="p-2 text-center flex items-center justify-center h-full"><span class="text-lg font-black text-slate-800 uppercase break-all">${val}</span></div>`) : ''}
                                 </div>
                             </div>
                         </div>
                     </div>
                 `;
-            });
+            }
 
             const log = document.getElementById('clueLog');
-            log.innerHTML = (data.chat || []).slice(-20).reverse().map(m => `
-                <div class="mb-2 p-3 rounded-2xl ${m.isCorrect ? 'bg-green-600 text-white w-full text-center font-black' : (m.sender === playerRole ? 'bg-indigo-600/40 ml-auto' : 'bg-white/5')} max-w-[90%] animate-in border border-white/5">
+            log.innerHTML = (data.chat || []).slice(-30).reverse().map(m => `
+                <div class="mb-2 p-3 rounded-2xl ${m.isCorrect ? 'bg-green-600 text-white w-full text-center font-black animate-bounce' : (m.sender === playerRole ? 'bg-indigo-600/40 ml-auto' : 'bg-white/5')} max-w-[90%] border border-white/5">
                     <p class="text-[8px] opacity-60 uppercase font-black mb-1">${m.senderName || 'Anonymous'}</p>
-                    <p class="text-xs font-bold leading-relaxed">${m.isCorrect ? '🎉 ' + m.text : m.text}</p>
+                    <p class="text-xs font-bold leading-relaxed">${m.text}</p>
                 </div>
             `).join('');
 
@@ -328,141 +284,156 @@
         };
 
         window.revealGame = () => updateDoc(doc(db, 'games', roomId), { open: true, p1Reveal:true, p2Reveal:true, p3Reveal:true, p4Reveal:true });
-        window.resetArena = () => setDoc(doc(db, 'games', roomId), { p1:"", p2:"", p3:"", p4:"", chat:[], open:false, p1Id:"", p2Id:"", p3Id:"", p4Id:"", p1Reveal:false, p2Reveal:false, p3Reveal:false, p4Reveal:false, p1Name:"", p2Name:"", p3Name:"", p4Name:"" }).then(() => location.reload());
+
+        // تعديل الريستارت ليبقى اللاعبين في الغرفة
+        window.resetArena = async () => {
+            const roomRef = doc(db, 'games', roomId);
+            lastLoadedImage = null;
+            await updateDoc(roomRef, { 
+                p1:"", p2:"", p3:"", p4:"", 
+                chat:[], open:false, 
+                p1Reveal:false, p2Reveal:false, p3Reveal:false, p4Reveal:false 
+            });
+        };
+
+        window.fullReset = () => setDoc(doc(db, 'games', roomId), { p1:"", p2:"", p3:"", p4:"", chat:[], open:false, p1Id:"", p2Id:"", p3Id:"", p4Id:"", p1Reveal:false, p2Reveal:false, p3Reveal:false, p4Reveal:false }).then(() => location.reload());
+
+        function updateSendButtonUI() {
+            const t = translations[currentLang];
+            const sendBtn = document.getElementById('sendClueBtn');
+            const clueInput = document.getElementById('clueInput');
+            if (playerRole === 'viewer') {
+                sendBtn.disabled = true;
+                clueInput.disabled = true;
+                clueInput.placeholder = t.spectatorView;
+            } else {
+                sendBtn.disabled = false;
+                clueInput.disabled = false;
+                clueInput.placeholder = t.chatPlaceholder;
+            }
+        }
 
         onAuthStateChanged(auth, async (user) => {
             if (user) { 
                 currentUser = user; 
                 initRoomListener();
-                // استرجاع الاسم عند تحميل الصفحة
                 const saved = localStorage.getItem('cardx_username');
                 if(saved) document.getElementById('userNameInput').value = saved;
-            }
-            else { await signInAnonymously(auth); }
+            } else { await signInAnonymously(auth); }
         });
 
         window.onload = applyTranslations;
     </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700;800&family=Noto+Sans+Arabic:wght@400;700;900&display=swap');
-        body { background: #030712; color: #f8fafc; font-family: 'Plus Jakarta Sans', 'Noto Sans Arabic', sans-serif; overflow-x: hidden; -webkit-tap-highlight-color: transparent; }
-        .glass-panel { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
-        
-        .logo-animate {
-            background: linear-gradient(to right, #6366f1, #a855f7, #6366f1);
-            background-size: 200% auto;
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            animation: gradientMove 3s linear infinite, pulseSlow 2s ease-in-out infinite;
-        }
-
-        @keyframes gradientMove {
-            to { background-position: 200% center; }
-        }
-        @keyframes pulseSlow {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.9; transform: scale(1.02); }
-        }
-
+        body { background: #030712; color: #f8fafc; font-family: 'Plus Jakarta Sans', 'Noto Sans Arabic', sans-serif; overflow-x: hidden; }
+        .glass-panel { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.08); shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
+        .logo-animate { background: linear-gradient(to right, #6366f1, #a855f7, #6366f1); background-size: 200% auto; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: gradientMove 3s linear infinite; }
+        @keyframes gradientMove { to { background-position: 200% center; } }
         .perspective { perspective: 1200px; }
-        .card-inner { transition: transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1); transform-style: preserve-3d; width: 100%; height: 100%; position: relative; }
+        .card-inner { transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1); transform-style: preserve-3d; width: 100%; height: 100%; position: relative; }
         .is-flipped { transform: rotateY(180deg); }
-        .card-face { backface-visibility: hidden; position: absolute; width: 100%; height: 100%; border-radius: 1.2rem; display: flex; align-items: center; justify-content: center; }
-        @media (min-width: 768px) { .card-face { border-radius: 2rem; } }
+        .card-face { backface-visibility: hidden; position: absolute; width: 100%; height: 100%; border-radius: 1.5rem; display: flex; align-items: center; justify-content: center; }
         .card-back { transform: rotateY(180deg); background: #ffffff; color: #0f172a; }
         .card-front { background: linear-gradient(135deg, #1e1b4b, #0f172a); }
-        .animate-in { animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.1) forwards; }
-        @keyframes popIn { from { opacity: 0; transform: translateY(10px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
-        .custom-scroll::-webkit-scrollbar { width: 4px; }
+        .animate-in { animation: popIn 0.3s ease-out forwards; }
+        @keyframes popIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+        .custom-scroll::-webkit-scrollbar { width: 3px; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #6366f1; border-radius: 10px; }
     </style>
 </head>
-<body class="p-2 md:p-8 min-h-screen">
-    <div class="max-w-6xl mx-auto w-full">
-        <header class="flex justify-between items-center mb-6 md:mb-10">
-            <div class="flex items-center gap-3">
-                <!-- Site Icon -->
-                <div class="w-10 h-10 md:w-12 md:h-12 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20 rotate-3 animate-bounce">
-                    <svg viewBox="0 0 24 24" class="w-6 h-6 text-white fill-current">
-                        <path d="M19,2H5C3.89,2 3,2.89 3,4V20C3,21.11 3.89,22 5,22H19C20.11,22 21,21.11 21,20V4C21,2.89 20.11,2H19,2M12,17L8,13L12,9L16,13L12,17M12,7L10,5L12,3L14,5L12,7Z" />
-                    </svg>
-                </div>
-                <h1 id="siteLogoText" class="text-xl md:text-4xl font-black italic logo-animate">CARD<span class="text-indigo-500">X</span> ULTRA</h1>
-            </div>
-            <div class="flex items-center gap-2 md:gap-4">
-                <button onclick="toggleLanguage()" data-t="langBtn" class="bg-white/5 border border-white/10 px-3 py-1.5 rounded-xl text-[9px] md:text-[10px] font-black uppercase">العربية</button>
-                <button onclick="resetArena()" data-t="resetRoom" class="text-[8px] md:text-[9px] text-red-500/40 hover:text-red-500 font-black uppercase">Reset</button>
+<body class="p-4 md:p-8 min-h-screen flex flex-col items-center">
+    <div class="max-w-6xl w-full">
+        <header class="flex justify-between items-center mb-8">
+            <h1 id="siteLogoText" class="text-2xl md:text-4xl font-black italic logo-animate">CARDX ULTRA</h1>
+            <div class="flex gap-4">
+                <button onclick="toggleLanguage()" data-t="langBtn" class="bg-white/5 border border-white/10 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest">العربية</button>
+                <button onclick="fullReset()" data-t="resetRoom" class="text-red-500/50 hover:text-red-500 text-[10px] font-black uppercase">Reset</button>
             </div>
         </header>
 
         <!-- Lobby -->
-        <div id="lobbySection" class="flex flex-col items-center py-4 md:py-10 animate-in">
-            <div class="glass-panel p-6 md:p-12 rounded-[2.5rem] md:rounded-[4rem] text-center w-full max-w-3xl border-b-8 border-indigo-600/30">
-                <h2 data-t="title" class="text-3xl md:text-6xl font-black mb-3 logo-animate">CARDX ULTRA</h2>
-                <p data-t="setupDesc" class="text-slate-500 mb-8 text-[10px] md:text-xs font-bold uppercase tracking-widest">Pick your name and join</p>
-                
+        <div id="lobbySection" class="flex flex-col items-center py-10 animate-in">
+            <div class="glass-panel p-8 md:p-12 rounded-[3rem] text-center w-full max-w-2xl border-b-8 border-indigo-600/20">
+                <p data-t="setupDesc" class="text-slate-500 mb-8 text-xs font-bold uppercase tracking-widest">Choose Your Legend</p>
                 <div class="flex gap-2 mb-8">
-                    <input id="userNameInput" data-t="namePlaceholder" class="flex-1 bg-black/40 p-4 md:p-5 rounded-2xl md:rounded-3xl border border-white/10 outline-none focus:border-indigo-500 text-center font-bold text-sm md:text-base">
-                    <button onclick="updateStoredName()" data-t="saveName" class="bg-indigo-600 px-6 rounded-2xl md:rounded-3xl font-black text-[10px] md:text-xs shadow-xl active:scale-95 transition-transform">SAVE NAME</button>
+                    <input id="userNameInput" data-t="namePlaceholder" class="flex-1 bg-black/40 p-4 rounded-2xl border border-white/10 outline-none focus:border-indigo-500 text-center font-bold">
+                    <button onclick="updateStoredName()" data-t="saveName" class="bg-indigo-600 px-6 rounded-2xl font-black text-xs shadow-xl active:scale-95 transition-transform">SAVE NAME</button>
                 </div>
-
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 mb-6">
-                    <button id="p1Btn" onclick="setupPlayer(1)" class="p-4 rounded-2xl md:rounded-3xl bg-indigo-600 font-black text-[10px] md:text-sm shadow-lg">Player 1</button>
-                    <button id="p2Btn" onclick="setupPlayer(2)" class="p-4 rounded-2xl md:rounded-3xl bg-purple-600 font-black text-[10px] md:text-sm shadow-lg">Player 2</button>
-                    <button id="p3Btn" onclick="setupPlayer(3)" class="p-4 rounded-2xl md:rounded-3xl bg-indigo-600 font-black text-[10px] md:text-sm shadow-lg">Player 3</button>
-                    <button id="p4Btn" onclick="setupPlayer(4)" class="p-4 rounded-2xl md:rounded-3xl bg-purple-600 font-black text-[10px] md:text-sm shadow-lg">Player 4</button>
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <button id="p1Btn" onclick="setupPlayer(1)" class="p-6 rounded-3xl bg-indigo-600 font-black">Player 1</button>
+                    <button id="p2Btn" onclick="setupPlayer(2)" class="p-6 rounded-3xl bg-purple-600 font-black">Player 2</button>
+                    <button id="p3Btn" onclick="setupPlayer(3)" class="p-6 rounded-3xl bg-indigo-600 font-black">Player 3</button>
+                    <button id="p4Btn" onclick="setupPlayer(4)" class="p-6 rounded-3xl bg-purple-600 font-black">Player 4</button>
                 </div>
-                <button onclick="setupPlayer('viewer')" data-t="viewer" class="w-full bg-slate-800/40 p-4 rounded-2xl md:rounded-3xl font-black text-slate-400 border border-white/5 text-[10px] md:text-sm">Spectator Mode 👀</button>
+                <button onclick="setupPlayer('viewer')" data-t="viewer" class="w-full bg-slate-800/40 p-4 rounded-3xl font-black text-slate-400 border border-white/5 uppercase text-xs">Spectator Mode 👀</button>
             </div>
         </div>
 
         <!-- Arena -->
-        <div id="arenaSection" class="hidden space-y-4 md:space-y-8 animate-in">
-            <div class="flex justify-between items-center bg-black/20 p-2 md:p-4 rounded-[1.5rem] border border-white/5">
-                <button onclick="exitToLobby()" data-t="exit" class="bg-red-500/10 text-red-500 text-[8px] md:text-[9px] font-black px-4 py-2 md:py-3 rounded-xl border border-red-500/20 uppercase">Back to Lobby 🚪</button>
-                <div class="flex items-center gap-2 pr-2">
-                    <span class="text-[8px] md:text-[10px] font-black text-slate-500 uppercase tracking-tighter">Live Arena</span>
-                </div>
+        <div id="arenaSection" class="hidden space-y-6 animate-in">
+            <div class="flex justify-between items-center bg-black/30 p-4 rounded-2xl border border-white/5">
+                <button onclick="exitToLobby()" data-t="exit" class="text-red-500 text-[10px] font-black uppercase px-4 py-2 bg-red-500/10 rounded-xl border border-red-500/20">Back to Lobby 🚪</button>
+                <span class="text-[10px] font-black text-indigo-400 uppercase tracking-widest animate-pulse">Live Battle Active</span>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-6 items-start">
-                <div id="mySecretBox" class="lg:col-span-4 glass-panel p-4 md:p-6 rounded-[2rem] border-t-4 border-indigo-600 order-2 lg:order-1">
-                    <div class="flex justify-between items-center mb-4 md:mb-6">
-                        <h3 data-t="myCard" class="text-[9px] md:text-[10px] font-black text-indigo-400 uppercase tracking-widest">Your Secret</h3>
-                        <button id="revealToggle" onclick="toggleMyReveal()" class="bg-indigo-600/20 text-indigo-400 text-[8px] px-3 py-1.5 rounded-xl font-black uppercase">Show 👀</button>
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                <!-- My Card Section -->
+                <div id="mySecretBox" class="lg:col-span-4 glass-panel p-6 rounded-[2.5rem] border-t-4 border-indigo-600 order-2 lg:order-1 shadow-2xl">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 data-t="myCard" class="text-xs font-black text-indigo-400 uppercase tracking-widest">Secret Vault</h3>
+                        <button id="revealToggle" onclick="toggleMyReveal()" class="bg-indigo-600 text-white text-[9px] px-4 py-1.5 rounded-xl font-black uppercase shadow-lg shadow-indigo-500/30 tracking-tight">Show 👀</button>
                     </div>
                     <div class="flex gap-2 mb-4">
-                        <input id="cardInput" data-t="placeholderCard" class="flex-1 bg-black/40 text-[10px] md:text-xs p-3 rounded-xl border border-white/5 outline-none">
-                        <button onclick="saveTextCard()" data-t="save" class="bg-indigo-600 px-4 rounded-xl text-[9px] font-black shadow-lg">SAVE</button>
-                        <button onclick="document.getElementById('file').click()" class="bg-slate-800 px-3 rounded-xl text-lg shadow-lg">📷</button>
+                        <input id="cardInput" data-t="placeholderCard" class="flex-1 bg-black/40 text-xs p-3 rounded-xl border border-white/5 outline-none focus:border-indigo-500">
+                        <button onclick="saveTextCard()" class="bg-indigo-600 px-4 rounded-xl text-[10px] font-black">SAVE</button>
+                        <button onclick="document.getElementById('file').click()" class="bg-slate-800 px-3 rounded-xl text-lg">📷</button>
                         <input type="file" id="file" class="hidden" accept="image/*" onchange="uploadImage(event)">
                     </div>
-                    <div class="perspective w-full aspect-[3/4] max-w-[140px] md:max-w-[180px] mx-auto">
-                        <div id="myFlipCard" class="card-inner cursor-pointer" onclick="toggleMyPrivateView()">
-                            <div class="card-face card-front border border-indigo-500/20">
-                                <span class="text-3xl opacity-20">🃏</span>
+                    <div class="perspective w-full aspect-[3/4] max-w-[180px] mx-auto">
+                        <div id="myFlipCard" class="card-inner cursor-pointer" onclick="isLocalPreviewOpen = !isLocalPreviewOpen; getDoc(doc(db,'games',roomId)).then(s=>updateGameArena(s.data()))">
+                            <div class="card-face card-front border border-white/10">
+                                <span class="text-4xl opacity-10">🃏</span>
                             </div>
-                            <div id="myCardContent" class="card-face card-back overflow-hidden border-2 border-indigo-600 shadow-xl"></div>
+                            <div id="myCardContent" class="card-face card-back overflow-hidden border-4 border-indigo-600 shadow-2xl"></div>
                         </div>
                     </div>
                 </div>
 
+                <!-- Opponents Grid -->
                 <div class="lg:col-span-8 order-1 lg:order-2">
-                    <div id="opponentsGrid" class="w-full"></div>
+                    <div id="opponentsGrid" class="grid grid-cols-2 md:grid-cols-3 gap-4"></div>
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-6 pb-6">
-                <div class="lg:col-span-8 glass-panel p-4 md:p-6 rounded-[2rem]">
-                    <div id="clueLog" class="h-40 md:h-48 overflow-y-auto mb-4 p-3 bg-black/40 rounded-2xl border border-white/5 custom-scroll"></div>
-                    <div class="flex gap-2">
-                        <input id="clueInput" data-t="chatPlaceholder" class="flex-1 bg-black/40 p-3 rounded-xl text-xs border border-white/5 outline-none focus:border-indigo-500" onkeypress="if(event.key==='Enter') sendClue()">
-                        <button id="sendClueBtn" onclick="sendClue()" data-t="send" class="bg-indigo-600 px-6 rounded-xl text-[10px] font-black">SEND</button>
+            <!-- Chat & Controls -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <div class="lg:col-span-8 glass-panel p-6 rounded-[2.5rem] flex flex-col">
+                    <div id="clueLog" class="h-48 overflow-y-auto mb-4 p-4 bg-black/40 rounded-3xl border border-white/5 custom-scroll"></div>
+                    <div class="relative flex gap-2">
+                        <!-- Emoji Picker -->
+                        <div id="emojiPicker" class="hidden absolute bottom-full left-0 mb-4 p-4 glass-panel rounded-3xl grid grid-cols-6 gap-2 z-50 animate-in">
+                            <button onclick="addEmoji('🔥')" class="text-2xl hover:scale-125 transition-transform">🔥</button>
+                            <button onclick="addEmoji('😂')" class="text-2xl hover:scale-125 transition-transform">😂</button>
+                            <button onclick="addEmoji('🤔')" class="text-2xl hover:scale-125 transition-transform">🤔</button>
+                            <button onclick="addEmoji('👑')" class="text-2xl hover:scale-125 transition-transform">👑</button>
+                            <button onclick="addEmoji('💡')" class="text-2xl hover:scale-125 transition-transform">💡</button>
+                            <button onclick="addEmoji('🤡')" class="text-2xl hover:scale-125 transition-transform">🤡</button>
+                            <button onclick="addEmoji('💎')" class="text-2xl hover:scale-125 transition-transform">💎</button>
+                            <button onclick="addEmoji('👏')" class="text-2xl hover:scale-125 transition-transform">👏</button>
+                            <button onclick="addEmoji('🚀')" class="text-2xl hover:scale-125 transition-transform">🚀</button>
+                            <button onclick="addEmoji('🎯')" class="text-2xl hover:scale-125 transition-transform">🎯</button>
+                            <button onclick="addEmoji('👻')" class="text-2xl hover:scale-125 transition-transform">👻</button>
+                            <button onclick="addEmoji('🎉')" class="text-2xl hover:scale-125 transition-transform">🎉</button>
+                        </div>
+                        <button onclick="toggleEmojiPicker()" class="bg-white/5 border border-white/10 w-12 rounded-xl text-lg flex items-center justify-center hover:bg-white/10 transition-colors">😊</button>
+                        <input id="clueInput" data-t="chatPlaceholder" class="flex-1 bg-black/40 p-4 rounded-xl text-sm border border-white/5 outline-none focus:border-indigo-500" onkeypress="if(event.key==='Enter') sendClue()">
+                        <button id="sendClueBtn" onclick="sendClue()" data-t="send" class="bg-indigo-600 px-8 rounded-xl text-xs font-black shadow-lg shadow-indigo-500/20 uppercase tracking-widest">SEND</button>
                     </div>
                 </div>
-                <div class="lg:col-span-4 flex flex-col gap-2">
-                    <button id="revealBtn" onclick="revealGame()" data-t="reveal" class="h-full glass-panel p-4 rounded-2xl text-red-500 text-[9px] font-black uppercase tracking-widest border-2 border-dashed border-red-500/20">Reveal All 🏁</button>
-                    <button id="resetBtn" onclick="resetArena()" data-t="reset" class="hidden h-full rounded-2xl bg-green-600 text-white font-black text-lg shadow-lg">RESTART 🔄</button>
+                <div class="lg:col-span-4 flex flex-col gap-3">
+                    <button id="revealBtn" onclick="revealGame()" data-t="reveal" class="h-full bg-slate-900 border-2 border-dashed border-red-500/30 rounded-[2rem] text-red-500 text-xs font-black uppercase tracking-widest hover:bg-red-500/5 transition-colors">Reveal All 🏁</button>
+                    <button id="resetBtn" onclick="resetArena()" data-t="reset" class="hidden h-full rounded-[2rem] bg-green-600 text-white font-black text-xl shadow-2xl animate-in">NEW ROUND 🔄</button>
                 </div>
             </div>
         </div>
