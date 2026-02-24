@@ -38,7 +38,7 @@
                 p1: "Player 1", p2: "Player 2", p3: "Player 3", p4: "Player 4",
                 occupied: "(Occupied)", viewer: "Spectator Mode 👀",
                 myCard: "Your Secret Card", placeholderCard: "Word or Image...",
-                save: "Save", reveal: "Reveal Everything 🏁", exit: "Back to Lobby 🚪",
+                save: "Save", reveal: "Reveal All 🏁", exit: "Back to Lobby 🚪",
                 empty: "Waiting...", you: "You",
                 reset: "New Round 🔄", resetRoom: "Reset All",
                 showToOpponent: "Show Card 👀", hideFromOpponent: "Hide Card 🔒",
@@ -46,7 +46,11 @@
                 connecting: "Connecting...", langBtn: "العربية",
                 send: "Send", spectatorView: "Spectator Mode 👀",
                 chatPlaceholder: "Enter guess...",
-                saveName: "Save Name"
+                saveName: "Save Name",
+                voteTitle: "Reveal Request!",
+                voteDesc: "All players must agree to reveal cards.",
+                approve: "Approve ✅",
+                reject: "Reject ❌"
             },
             ar: {
                 title: "كارد<span class='text-white'>X</span> الترا",
@@ -55,7 +59,7 @@
                 p1: "اللاعب 1", p2: "اللاعب 2", p3: "اللاعب 3", p4: "اللاعب 4",
                 occupied: "(محجوز)", viewer: "وضع المشاهدة 👀",
                 myCard: "كارتك السري", placeholderCard: "كلمة أو صورة...",
-                save: "حفظ", reveal: "كشف الأوراق 🏁", exit: "خروج للرئيسية 🚪",
+                save: "حفظ", reveal: "كشف الكل 🏁", exit: "خروج للرئيسية 🚪",
                 empty: "بانتظار الاختيار...", you: "أنت",
                 reset: "جولة جديدة 🔄", resetRoom: "إعادة الكل",
                 showToOpponent: "إظهار الكارت 👀", hideFromOpponent: "إخفاء الكارت 🔒",
@@ -63,7 +67,11 @@
                 connecting: "جاري الاتصال...", langBtn: "English",
                 send: "إرسال", spectatorView: "وضع المشاهدة 👀",
                 chatPlaceholder: "اكتب توقعك هنا...",
-                saveName: "حفظ الاسم"
+                saveName: "حفظ الاسم",
+                voteTitle: "طلب كشف الأوراق!",
+                voteDesc: "يجب أن يوافق الجميع ليتم الكشف الجماعي.",
+                approve: "أوافق ✅",
+                reject: "أرفض ❌"
             }
         };
 
@@ -90,12 +98,13 @@
             const roomRef = doc(db, 'games', roomId);
             onSnapshot(roomRef, (docSnap) => {
                 if (!docSnap.exists()) {
-                    setDoc(roomRef, { p1:"", p2:"", p3:"", p4:"", chat:[], open:false });
+                    setDoc(roomRef, { p1:"", p2:"", p3:"", p4:"", chat:[], open:false, votes: [] });
                     return;
                 }
                 const data = docSnap.data();
                 updateLobbyUI(data);
                 if (playerRole) updateGameArena(data);
+                handleVoteModalUI(data);
             });
         };
 
@@ -237,7 +246,6 @@
                 const isImg = val?.startsWith('data:image');
                 const pName = data[`p${i}Name`] || `Player ${i}`;
                 
-                // التعديل الثاني: ضمان التناسق في الحجم عبر تثبيت الـ aspect ratio والـ max-width
                 grid.innerHTML += `
                     <div class="glass-panel p-4 rounded-[2rem] flex flex-col items-center animate-in">
                         <div class="mb-2 bg-black/30 px-3 py-1 rounded-full flex items-center gap-2">
@@ -288,7 +296,53 @@
             input.value = '';
         };
 
-        window.revealGame = () => updateDoc(doc(db, 'games', roomId), { open: true, p1Reveal:true, p2Reveal:true, p3Reveal:true, p4Reveal:true });
+        // وظائف نظام التصويت الجديد
+        window.revealGame = async () => {
+            const snap = await getDoc(doc(db, 'games', roomId));
+            const data = snap.data();
+            if (data.votingActive) return;
+            await updateDoc(doc(db, 'games', roomId), { 
+                votingActive: true, 
+                votes: [currentUser.uid] 
+            });
+        };
+
+        window.castVote = async (approved) => {
+            const snap = await getDoc(doc(db, 'games', roomId));
+            const data = snap.data();
+            if (!approved) {
+                await updateDoc(doc(db, 'games', roomId), { votingActive: false, votes: [] });
+                return;
+            }
+            const newVotes = [...new Set([...(data.votes || []), currentUser.uid])];
+            
+            // حساب عدد اللاعبين النشطين
+            let activePlayerCount = 0;
+            for(let i=1; i<=4; i++) if(data[`p${i}Id`]) activePlayerCount++;
+
+            if (newVotes.length >= activePlayerCount) {
+                await updateDoc(doc(db, 'games', roomId), { 
+                    open: true, 
+                    p1Reveal:true, p2Reveal:true, p3Reveal:true, p4Reveal:true,
+                    votingActive: false,
+                    votes: []
+                });
+            } else {
+                await updateDoc(doc(db, 'games', roomId), { votes: newVotes });
+            }
+        };
+
+        function handleVoteModalUI(data) {
+            const modal = document.getElementById('voteModal');
+            if (data.votingActive && !data.open) {
+                modal.classList.remove('hidden');
+                let activeCount = 0;
+                for(let i=1; i<=4; i++) if(data[`p${i}Id`]) activeCount++;
+                document.getElementById('voteProgressText').innerText = `${(data.votes || []).length} / ${activeCount}`;
+            } else {
+                modal.classList.add('hidden');
+            }
+        }
 
         window.resetArena = async () => {
             const roomRef = doc(db, 'games', roomId);
@@ -296,11 +350,12 @@
             await updateDoc(roomRef, { 
                 p1:"", p2:"", p3:"", p4:"", 
                 chat:[], open:false, 
-                p1Reveal:false, p2Reveal:false, p3Reveal:false, p4Reveal:false 
+                p1Reveal:false, p2Reveal:false, p3Reveal:false, p4Reveal:false,
+                votingActive: false, votes: []
             });
         };
 
-        window.fullReset = () => setDoc(doc(db, 'games', roomId), { p1:"", p2:"", p3:"", p4:"", chat:[], open:false, p1Id:"", p2Id:"", p3Id:"", p4Id:"", p1Reveal:false, p2Reveal:false, p3Reveal:false, p4Reveal:false }).then(() => location.reload());
+        window.fullReset = () => setDoc(doc(db, 'games', roomId), { p1:"", p2:"", p3:"", p4:"", chat:[], open:false, p1Id:"", p2Id:"", p3Id:"", p4Id:"", p1Reveal:false, p2Reveal:false, p3Reveal:false, p4Reveal:false, votingActive: false, votes: [] }).then(() => location.reload());
 
         function updateSendButtonUI() {
             const t = translations[currentLang];
@@ -333,8 +388,6 @@
         body { background: #030712; color: #f8fafc; font-family: 'Plus Jakarta Sans', 'Noto Sans Arabic', sans-serif; overflow-x: hidden; }
         .glass-panel { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.08); shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
         
-        /* التعديل الأول: Logo Animation */
-        .logo-container { display: flex; align-items: center; gap: 10px; }
         .logo-animate { 
             background: linear-gradient(to right, #6366f1, #a855f7, #ec4899, #6366f1); 
             background-size: 200% auto; 
@@ -345,43 +398,49 @@
             font-style: italic;
         }
         @keyframes gradientMove { to { background-position: 200% center; } }
-        .bounce-icon { animation: bounce 2s infinite; }
-        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
-        .pulse-sparkle { animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0% { opacity: 0.5; transform: scale(1); } 50% { opacity: 1; transform: scale(1.2); } 100% { opacity: 0.5; transform: scale(1); } }
-
+        
         .perspective { perspective: 1200px; }
         .card-inner { transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1); transform-style: preserve-3d; width: 100%; height: 100%; position: relative; }
         .is-flipped { transform: rotateY(180deg); }
         .card-face { backface-visibility: hidden; position: absolute; width: 100%; height: 100%; border-radius: 1.5rem; display: flex; align-items: center; justify-content: center; }
         .card-back { transform: rotateY(180deg); background: #ffffff; color: #0f172a; }
         .card-front { background: linear-gradient(135deg, #1e1b4b, #0f172a); }
-        .animate-in { animation: popIn 0.3s ease-out forwards; }
-        @keyframes popIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+        .modal-overlay { background: rgba(0,0,0,0.85); backdrop-filter: blur(10px); }
         .custom-scroll::-webkit-scrollbar { width: 3px; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #6366f1; border-radius: 10px; }
     </style>
 </head>
 <body class="p-4 md:p-8 min-h-screen flex flex-col items-center">
+    <!-- Vote Modal -->
+    <div id="voteModal" class="hidden fixed inset-0 z-[100] modal-overlay flex items-center justify-center p-4">
+        <div class="glass-panel p-8 max-w-sm w-full text-center border-indigo-500/30">
+            <div class="text-5xl mb-4">🗳️</div>
+            <h2 data-t="voteTitle" class="text-2xl font-black mb-2 text-indigo-400">Reveal Request!</h2>
+            <p data-t="voteDesc" class="text-xs text-slate-400 mb-6">All players must agree to reveal cards.</p>
+            <div class="bg-black/40 p-4 rounded-2xl mb-6">
+                <span id="voteProgressText" class="text-3xl font-black text-white italic">0 / 0</span>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="castVote(true)" data-t="approve" class="flex-1 bg-green-600 p-3 rounded-xl font-black text-xs uppercase">Approve ✅</button>
+                <button onclick="castVote(false)" data-t="reject" class="flex-1 bg-red-600 p-3 rounded-xl font-black text-xs uppercase">Reject ❌</button>
+            </div>
+        </div>
+    </div>
+
     <div class="max-w-6xl w-full">
-        <!-- Header with animated logo -->
         <header class="flex justify-between items-center mb-8">
-            <div class="logo-container">
-                <div class="relative flex items-center justify-center">
-                    <!-- SVG Gamepad Icon -->
-                    <svg class="w-8 h-8 text-indigo-500 bounce-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="12" x2="10" y2="12"></line><line x1="8" y1="10" x2="8" y2="14"></line><circle cx="15" cy="13" r="1"></circle><circle cx="18" cy="11" r="1"></circle><rect x="2" y="6" width="20" height="12" rx="2"></rect></svg>
-                    <svg class="w-4 h-4 text-yellow-400 absolute -top-1 -right-1 pulse-sparkle" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
-                </div>
+            <div class="flex items-center gap-3">
+                <svg class="w-8 h-8 text-indigo-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"></rect><circle cx="15" cy="13" r="1"></circle><circle cx="18" cy="11" r="1"></circle></svg>
                 <h1 id="siteLogoText" class="text-2xl md:text-4xl logo-animate">CARDX ULTRA</h1>
             </div>
             <div class="flex gap-4">
-                <button onclick="toggleLanguage()" data-t="langBtn" class="bg-white/5 border border-white/10 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest">العربية</button>
+                <button onclick="toggleLanguage()" data-t="langBtn" class="bg-white/5 border border-white/10 px-4 py-2 rounded-xl text-[10px] font-black uppercase">العربية</button>
                 <button onclick="fullReset()" data-t="resetRoom" class="text-red-500/50 hover:text-red-500 text-[10px] font-black uppercase">Reset</button>
             </div>
         </header>
 
         <!-- Lobby -->
-        <div id="lobbySection" class="flex flex-col items-center py-10 animate-in">
+        <div id="lobbySection" class="flex flex-col items-center py-10">
             <div class="glass-panel p-8 md:p-12 rounded-[3rem] text-center w-full max-w-2xl border-b-8 border-indigo-600/20">
                 <p data-t="setupDesc" class="text-slate-500 mb-8 text-xs font-bold uppercase tracking-widest">Choose Your Legend</p>
                 <div class="flex gap-2 mb-8">
@@ -399,7 +458,7 @@
         </div>
 
         <!-- Arena -->
-        <div id="arenaSection" class="hidden space-y-6 animate-in">
+        <div id="arenaSection" class="hidden space-y-6">
             <div class="flex justify-between items-center bg-black/30 p-4 rounded-2xl border border-white/5">
                 <button onclick="exitToLobby()" data-t="exit" class="text-red-500 text-[10px] font-black uppercase px-4 py-2 bg-red-500/10 rounded-xl border border-red-500/20">Back to Lobby 🚪</button>
                 <span class="text-[10px] font-black text-indigo-400 uppercase tracking-widest animate-pulse">Live Battle Active</span>
@@ -418,7 +477,6 @@
                         <button onclick="document.getElementById('file').click()" class="bg-slate-800 px-3 rounded-xl text-lg">📷</button>
                         <input type="file" id="file" class="hidden" accept="image/*" onchange="uploadImage(event)">
                     </div>
-                    <!-- Fixed Aspect Ratio for My Card -->
                     <div class="perspective w-full aspect-[3/4] max-w-[200px] mx-auto">
                         <div id="myFlipCard" class="card-inner cursor-pointer" onclick="isLocalPreviewOpen = !isLocalPreviewOpen; getDoc(doc(db,'games',roomId)).then(s=>updateGameArena(s.data()))">
                             <div class="card-face card-front border border-white/10">
@@ -440,22 +498,18 @@
                 <div class="lg:col-span-8 glass-panel p-6 rounded-[2.5rem] flex flex-col">
                     <div id="clueLog" class="h-48 overflow-y-auto mb-4 p-4 bg-black/40 rounded-3xl border border-white/5 custom-scroll"></div>
                     <div class="relative flex gap-2">
-                        <div id="emojiPicker" class="hidden absolute bottom-full left-0 mb-4 p-4 glass-panel rounded-3xl grid grid-cols-6 gap-2 z-50 animate-in">
-                            <button onclick="addEmoji('🔥')" class="text-2xl hover:scale-125 transition-transform">🔥</button>
-                            <button onclick="addEmoji('😂')" class="text-2xl hover:scale-125 transition-transform">😂</button>
-                            <button onclick="addEmoji('🤔')" class="text-2xl hover:scale-125 transition-transform">🤔</button>
-                            <button onclick="addEmoji('👑')" class="text-2xl hover:scale-125 transition-transform">👑</button>
-                            <button onclick="addEmoji('💡')" class="text-2xl hover:scale-125 transition-transform">💡</button>
-                            <button onclick="addEmoji('🤡')" class="text-2xl hover:scale-125 transition-transform">🤡</button>
-                        </div>
-                        <button onclick="toggleEmojiPicker()" class="bg-white/5 border border-white/10 w-12 rounded-xl text-lg flex items-center justify-center hover:bg-white/10 transition-colors">😊</button>
+                        <button onclick="toggleEmojiPicker()" class="bg-white/5 border border-white/10 w-12 rounded-xl text-lg flex items-center justify-center">😊</button>
                         <input id="clueInput" data-t="chatPlaceholder" class="flex-1 bg-black/40 p-4 rounded-xl text-sm border border-white/5 outline-none focus:border-indigo-500" onkeypress="if(event.key==='Enter') sendClue()">
-                        <button id="sendClueBtn" onclick="sendClue()" data-t="send" class="bg-indigo-600 px-8 rounded-xl text-xs font-black shadow-lg shadow-indigo-500/20 uppercase tracking-widest">SEND</button>
+                        <button id="sendClueBtn" onclick="sendClue()" data-t="send" class="bg-indigo-600 px-8 rounded-xl text-xs font-black uppercase tracking-widest">SEND</button>
+                        <div id="emojiPicker" class="hidden absolute bottom-full left-0 mb-4 p-4 glass-panel rounded-3xl grid grid-cols-6 gap-2 z-50 animate-in">
+                            <button onclick="addEmoji('🔥')" class="text-2xl">🔥</button><button onclick="addEmoji('😂')" class="text-2xl">😂</button>
+                            <button onclick="addEmoji('🤔')" class="text-2xl">🤔</button><button onclick="addEmoji('👑')" class="text-2xl">👑</button>
+                        </div>
                     </div>
                 </div>
                 <div class="lg:col-span-4 flex flex-col gap-3">
-                    <button id="revealBtn" onclick="revealGame()" data-t="reveal" class="h-full bg-slate-900 border-2 border-dashed border-red-500/30 rounded-[2rem] text-red-500 text-xs font-black uppercase tracking-widest hover:bg-red-500/5 transition-colors">Reveal All 🏁</button>
-                    <button id="resetBtn" onclick="resetArena()" data-t="reset" class="hidden h-full rounded-[2rem] bg-green-600 text-white font-black text-xl shadow-2xl animate-in">NEW ROUND 🔄</button>
+                    <button id="revealBtn" onclick="revealGame()" data-t="reveal" class="h-full bg-slate-900 border-2 border-dashed border-red-500/30 rounded-[2rem] text-red-500 text-xs font-black uppercase tracking-widest">Reveal All 🏁</button>
+                    <button id="resetBtn" onclick="resetArena()" data-t="reset" class="hidden h-full rounded-[2rem] bg-green-600 text-white font-black text-xl shadow-2xl">NEW ROUND 🔄</button>
                 </div>
             </div>
         </div>
