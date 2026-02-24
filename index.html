@@ -52,7 +52,8 @@
                 approve: "Approve ✅",
                 reject: "Reject ❌",
                 battleActive: "Live Battle Active",
-                secretVault: "Secret Vault"
+                secretVault: "Secret Vault",
+                emptyCardMsg: "EMPTY 🕳️"
             },
             ar: {
                 title: "كارد<span class='text-white'>X</span> الترا",
@@ -75,7 +76,8 @@
                 approve: "أوافق ✅",
                 reject: "أرفض ❌",
                 battleActive: "المعركة جارية الآن",
-                secretVault: "الخزنة السرية"
+                secretVault: "الخزنة السرية",
+                emptyCardMsg: "فارغ 🕳️"
             }
         };
 
@@ -104,7 +106,6 @@
             const t = translations[currentLang];
             document.getElementById('mainHtml').dir = currentLang === 'ar' ? 'rtl' : 'ltr';
             document.getElementById('siteLogoText').innerHTML = t.title;
-            
             document.querySelectorAll('[data-t]').forEach(el => {
                 const key = el.getAttribute('data-t');
                 if (t[key]) {
@@ -246,8 +247,19 @@
             if (playerRole !== 'viewer') {
                 const val = lastLoadedImage || data[`p${playerRole}`];
                 const el = document.getElementById('myCardContent');
-                if (val?.startsWith('data:image')) el.innerHTML = `<img src="${val}" class="w-full h-full object-contain" />`;
-                else el.innerHTML = `<div class="flex items-center justify-center h-full p-4 text-center"><span class="text-2xl font-black text-white break-all uppercase drop-shadow-md">${val || ''}</span></div>`;
+                
+                if (val && val.startsWith('data:image')) {
+                    el.innerHTML = `<img src="${val}" class="w-full h-full object-contain" />`;
+                } else if (val && val.trim() !== "") {
+                    el.innerHTML = `<div class="flex items-center justify-center h-full p-4 text-center"><span class="text-2xl font-black text-slate-800 break-all uppercase">${val}</span></div>`;
+                } else {
+                    // Empty state logic
+                    el.innerHTML = `
+                        <div class="flex flex-col items-center justify-center h-full p-4 text-center animate-pulse">
+                            <span class="text-4xl mb-2">❓</span>
+                            <span class="text-xs font-black text-slate-400 uppercase tracking-widest">${t.emptyCardMsg}</span>
+                        </div>`;
+                }
 
                 const isRevealedToPublic = data[`p${playerRole}Reveal`] || false;
                 document.getElementById('revealToggle').innerText = isRevealedToPublic ? t.hideFromOpponent : t.showToOpponent;
@@ -280,7 +292,7 @@
                                     <span class="text-4xl opacity-20">🕵️‍♂️</span>
                                 </div>
                                 <div class="card-face card-back overflow-hidden border-4 border-indigo-500 shadow-2xl">
-                                    ${reveal && val ? (isImg ? `<img src="${val}" class="w-full h-full object-contain p-1" />` : `<div class="p-2 text-center flex items-center justify-center h-full"><span class="text-lg font-black text-white uppercase break-all drop-shadow-md">${val}</span></div>`) : ''}
+                                    ${reveal && val ? (isImg ? `<img src="${val}" class="w-full h-full object-contain p-1" />` : `<div class="p-2 text-center flex items-center justify-center h-full"><span class="text-lg font-black text-slate-800 uppercase break-all">${val}</span></div>`) : ''}
                                 </div>
                             </div>
                         </div>
@@ -456,15 +468,7 @@
         .card-inner { transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1); transform-style: preserve-3d; width: 100%; height: 100%; position: relative; }
         .is-flipped { transform: rotateY(180deg); }
         .card-face { backface-visibility: hidden; position: absolute; width: 100%; height: 100%; border-radius: 1.5rem; display: flex; align-items: center; justify-content: center; }
-        
-        /* التعديل المطلوب: لون الكارت من الداخل (الوجه الخلفي) */
-        .card-back { 
-            transform: rotateY(180deg); 
-            background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%); 
-            color: #ffffff;
-            box-shadow: inset 0 0 40px rgba(0,0,0,0.5);
-        }
-        
+        .card-back { transform: rotateY(180deg); background: #ffffff; color: #0f172a; }
         .card-front { background: linear-gradient(135deg, #1e1b4b, #0f172a); }
         .modal-overlay { background: rgba(0,0,0,0.85); backdrop-filter: blur(10px); }
         .custom-scroll::-webkit-scrollbar { width: 3px; }
@@ -552,7 +556,6 @@
                             <div class="card-face card-front border border-white/10 shadow-2xl">
                                 <span class="text-5xl opacity-20 filter grayscale">🃏</span>
                             </div>
-                            <!-- تم تغيير الخلفية هنا -->
                             <div id="myCardContent" class="card-face card-back overflow-hidden border-4 border-indigo-600 shadow-2xl"></div>
                         </div>
                     </div>
@@ -573,20 +576,19 @@
                         <input id="clueInput" data-t="chatPlaceholder" class="flex-1 bg-black/40 p-5 rounded-2xl text-sm border border-white/5 outline-none focus:border-indigo-500 shadow-inner" onkeypress="if(event.key==='Enter') sendClue()">
                         <button id="sendClueBtn" onclick="sendClue()" data-t="send" class="bg-indigo-600 px-10 rounded-2xl text-xs font-black uppercase tracking-[0.2em] text-white shadow-xl hover:bg-indigo-500 transition-all active:scale-95">SEND</button>
                         
-                        <!-- Emoji Picker المحسن -->
-                        <div id="emojiPicker" class="hidden absolute bottom-full left-0 mb-4 p-5 theme-panel rounded-[2.5rem] border border-white/10 grid grid-cols-6 gap-2">
-                            <button onclick="addEmoji('🔥')" class="hover:scale-125 transition-transform">🔥</button>
-                            <button onclick="addEmoji('⭐')" class="hover:scale-125 transition-transform">⭐</button>
-                            <button onclick="addEmoji('✅')" class="hover:scale-125 transition-transform">✅</button>
-                            <button onclick="addEmoji('❌')" class="hover:scale-125 transition-transform">❌</button>
-                            <button onclick="addEmoji('🤔')" class="hover:scale-125 transition-transform">🤔</button>
-                            <button onclick="addEmoji('🤣')" class="hover:scale-125 transition-transform">🤣</button>
+                        <div id="emojiPicker" class="hidden absolute bottom-full left-0 mb-4 p-5 theme-panel rounded-[2.5rem] border border-white/10 grid grid-cols-6 gap-3 z-50 animate-in fade-in slide-in-from-bottom-5 duration-300">
+                            <button onclick="addEmoji('🔥')" class="text-2xl hover:scale-125 transition-transform">🔥</button>
+                            <button onclick="addEmoji('😂')" class="text-2xl hover:scale-125 transition-transform">😂</button>
+                            <button onclick="addEmoji('🤔')" class="text-2xl hover:scale-125 transition-transform">🤔</button>
+                            <button onclick="addEmoji('💡')" class="text-2xl hover:scale-125 transition-transform">💡</button>
+                            <button onclick="addEmoji('🎯')" class="text-2xl hover:scale-125 transition-transform">🎯</button>
+                            <button onclick="addEmoji('✅')" class="text-2xl hover:scale-125 transition-transform">✅</button>
                         </div>
                     </div>
                 </div>
                 <div class="lg:col-span-4 flex flex-col gap-4">
-                    <button id="revealBtn" onclick="revealGame()" data-t="reveal" class="w-full bg-indigo-600 py-6 rounded-[2.5rem] font-black text-white shadow-xl hover:bg-indigo-500 transition-all">Reveal All 🏁</button>
-                    <button id="resetBtn" onclick="resetArena()" data-t="reset" class="w-full bg-green-600 py-6 rounded-[2.5rem] font-black text-white shadow-xl hover:bg-green-500 transition-all hidden">NEW ROUND 🔄</button>
+                    <button id="revealBtn" onclick="revealGame()" data-t="reveal" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 p-6 rounded-[2rem] font-black text-sm text-white shadow-2xl hover:shadow-indigo-500/50 transition-all active:scale-95">REVEAL ALL 🏁</button>
+                    <button id="resetBtn" onclick="resetArena()" data-t="reset" class="w-full bg-slate-800 p-6 rounded-[2rem] font-black text-sm text-white shadow-xl hover:bg-slate-700 transition-all hidden border border-white/10">NEW ROUND 🔄</button>
                 </div>
             </div>
         </div>
