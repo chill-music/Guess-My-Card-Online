@@ -6,6 +6,7 @@
     <title>CardX Ultra - Pro Edition</title>
     <link rel="icon" href="https://fav.farm/🃏" />
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@400;700;900&display=swap" rel="stylesheet">
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getFirestore, doc, onSnapshot, setDoc, updateDoc, arrayUnion, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
@@ -27,61 +28,212 @@
         let playerRole = null; 
         let currentUser = null;
         let lastLoadedImage = null; 
-        let isLocalPreviewOpen = false; 
+        let isLocalPreviewOpen = false;
+        let connectionStatus = 'connecting';
+        let gameStats = { rounds: 0, correctGuesses: 0 };
         const roomId = "global_stable_v4_pro"; 
 
         const translations = {
             en: {
-                title: "CARD<span class='text-white'>X</span> ULTRA",
+                title: "CARD<span class='text-cyan-300'>X</span> ULTRA",
                 setupDesc: "Pick your name and join the arena",
                 namePlaceholder: "Enter your name...",
                 p1: "Player 1", p2: "Player 2", p3: "Player 3", p4: "Player 4",
-                occupied: "(Occupied)", viewer: "Spectator Mode 👀",
+                occupied: "Occupied", viewer: "Spectator Mode",
                 myCard: "Your Secret Card", placeholderCard: "Word or Image...",
-                save: "SAVE", reveal: "Reveal All 🏁", exit: "Back to Lobby 🚪",
+                save: "SAVE", reveal: "Request Reveal", exit: "Exit",
                 empty: "Waiting...", you: "You",
-                reset: "NEW ROUND 🔄", resetRoom: "Reset Room",
-                showToOpponent: "Show 👀", hideFromOpponent: "Hide 🔒",
-                isImage: "Picked an Image 📷", isWord: "Picked a Word 📝",
+                reset: "NEW ROUND", resetRoom: "Reset",
+                showToOpponent: "Reveal", hideFromOpponent: "Hidden",
+                isImage: "Image", isWord: "Word",
                 connecting: "Connecting...", langBtn: "العربية",
-                send: "SEND", spectatorView: "Spectator Mode 👀",
-                chatPlaceholder: "Enter guess...",
-                saveName: "SAVE NAME",
-                voteTitle: "Reveal Request!",
-                voteDesc: "All players must agree to reveal cards.",
-                approve: "Approve ✅",
-                reject: "Reject ❌",
-                battleActive: "Live Battle Active",
+                send: "SEND", spectatorView: "Spectator",
+                chatPlaceholder: "Type your guess...",
+                saveName: "SAVE",
+                voteTitle: "Reveal Request",
+                voteDesc: "All players must agree",
+                approve: "Approve",
+                reject: "Reject",
+                battleActive: "Live Battle",
                 secretVault: "Secret Vault",
-                emptyCardMsg: "EMPTY 🕳️"
+                emptyCardMsg: "EMPTY",
+                connected: "Connected",
+                disconnected: "Disconnected",
+                points: "Points",
+                rounds: "Rounds",
+                hint: "Send a hint",
+                correctGuess: "Correct Guess",
+                winner: "Winner",
+                gameStats: "Game Stats",
+                onlinePlayers: "Online"
             },
             ar: {
-                title: "كارد<span class='text-white'>X</span> الترا",
+                title: "كارد<span class='text-cyan-300'>إكس</span> الترا",
                 setupDesc: "اختر اسمك وانضم للساحة",
-                namePlaceholder: "اكتب اسمك هنا...",
+                namePlaceholder: "اكتب اسمك...",
                 p1: "اللاعب 1", p2: "اللاعب 2", p3: "اللاعب 3", p4: "اللاعب 4",
-                occupied: "(محجوز)", viewer: "وضع المشاهدة 👀",
+                occupied: "محجوز", viewer: "وضع المشاهدة",
                 myCard: "كارتك السري", placeholderCard: "كلمة أو صورة...",
-                save: "حفظ", reveal: "كشف الكل 🏁", exit: "خروج للرئيسية 🚪",
-                empty: "بانتظار الاختيار...", you: "أنت",
-                reset: "جولة جديدة 🔄", resetRoom: "إعادة تعيين",
-                showToOpponent: "إظهار 👀", hideFromOpponent: "إخفاء 🔒",
-                isImage: "اختار صورة 📷", isWord: "اختار كلمة 📝",
+                save: "حفظ", reveal: "طلب كشف", exit: "خروج",
+                empty: "بانتظار...", you: "أنت",
+                reset: "جولة جديدة", resetRoom: "إعادة",
+                showToOpponent: "إظهار", hideFromOpponent: "مخفي",
+                isImage: "صورة", isWord: "كلمة",
                 connecting: "جاري الاتصال...", langBtn: "English",
-                send: "إرسال", spectatorView: "وضع المشاهدة 👀",
-                chatPlaceholder: "اكتب توقعك هنا...",
-                saveName: "حفظ الاسم",
-                voteTitle: "طلب كشف الأوراق!",
-                voteDesc: "يجب أن يوافق الجميع ليتم الكشف الجماعي.",
-                approve: "أوافق ✅",
-                reject: "أرفض ❌",
-                battleActive: "المعركة جارية الآن",
+                send: "إرسال", spectatorView: "مشاهد",
+                chatPlaceholder: "اكتب توقعك...",
+                saveName: "حفظ",
+                voteTitle: "طلب كشف",
+                voteDesc: "يجب موافقة الجميع",
+                approve: "موافقة",
+                reject: "رفض",
+                battleActive: "المعركة جارية",
                 secretVault: "الخزنة السرية",
-                emptyCardMsg: "فارغ 🕳️"
+                emptyCardMsg: "فارغ",
+                connected: "متصل",
+                disconnected: "غير متصل",
+                points: "النقاط",
+                rounds: "الجولات",
+                hint: "أرسل تلميح",
+                correctGuess: "تخمين صحيح",
+                winner: "الفائز",
+                gameStats: "إحصائيات",
+                onlinePlayers: "متصل"
             }
         };
 
         let currentLang = 'en';
+
+        // Particle System
+        class ParticleSystem {
+            constructor(canvas) {
+                this.canvas = canvas;
+                this.ctx = canvas.getContext('2d');
+                this.particles = [];
+                this.mouseX = 0;
+                this.mouseY = 0;
+                this.resize();
+                window.addEventListener('resize', () => this.resize());
+                window.addEventListener('mousemove', (e) => {
+                    this.mouseX = e.clientX;
+                    this.mouseY = e.clientY;
+                });
+                this.init();
+                this.animate();
+            }
+
+            resize() {
+                this.canvas.width = window.innerWidth;
+                this.canvas.height = window.innerHeight;
+            }
+
+            init() {
+                for (let i = 0; i < 80; i++) {
+                    this.particles.push({
+                        x: Math.random() * this.canvas.width,
+                        y: Math.random() * this.canvas.height,
+                        size: Math.random() * 2 + 0.5,
+                        speedX: (Math.random() - 0.5) * 0.5,
+                        speedY: (Math.random() - 0.5) * 0.5,
+                        opacity: Math.random() * 0.5 + 0.2,
+                        hue: Math.random() * 60 + 180
+                    });
+                }
+            }
+
+            animate() {
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                this.particles.forEach((p, index) => {
+                    p.x += p.speedX;
+                    p.y += p.speedY;
+
+                    // Mouse interaction
+                    const dx = this.mouseX - p.x;
+                    const dy = this.mouseY - p.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < 150) {
+                        p.x -= dx * 0.01;
+                        p.y -= dy * 0.01;
+                    }
+
+                    // Wrap around
+                    if (p.x < 0) p.x = this.canvas.width;
+                    if (p.x > this.canvas.width) p.x = 0;
+                    if (p.y < 0) p.y = this.canvas.height;
+                    if (p.y > this.canvas.height) p.y = 0;
+
+                    // Draw particle
+                    this.ctx.beginPath();
+                    this.ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                    this.ctx.fillStyle = `hsla(${p.hue}, 80%, 60%, ${p.opacity})`;
+                    this.ctx.fill();
+
+                    // Connect nearby particles
+                    this.particles.slice(index + 1).forEach(p2 => {
+                        const d = Math.sqrt((p.x - p2.x) ** 2 + (p.y - p2.y) ** 2);
+                        if (d < 100) {
+                            this.ctx.beginPath();
+                            this.ctx.moveTo(p.x, p.y);
+                            this.ctx.lineTo(p2.x, p2.y);
+                            this.ctx.strokeStyle = `rgba(99, 102, 241, ${0.15 * (1 - d / 100)})`;
+                            this.ctx.stroke();
+                        }
+                    });
+                });
+
+                requestAnimationFrame(() => this.animate());
+            }
+        }
+
+        // Confetti System
+        function createConfetti() {
+            const colors = ['#6366f1', '#a855f7', '#ec4899', '#10b981', '#f59e0b', '#3b82f6'];
+            for (let i = 0; i < 150; i++) {
+                const confetti = document.createElement('div');
+                confetti.style.cssText = `
+                    position: fixed;
+                    width: ${Math.random() * 10 + 5}px;
+                    height: ${Math.random() * 10 + 5}px;
+                    background: ${colors[Math.floor(Math.random() * colors.length)]};
+                    left: ${Math.random() * 100}vw;
+                    top: -20px;
+                    border-radius: ${Math.random() > 0.5 ? '50%' : '0'};
+                    pointer-events: none;
+                    z-index: 9999;
+                    animation: confettiFall ${Math.random() * 3 + 2}s linear forwards;
+                    transform: rotate(${Math.random() * 360}deg);
+                `;
+                document.body.appendChild(confetti);
+                setTimeout(() => confetti.remove(), 5000);
+            }
+        }
+
+        // Add confetti animation
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes confettiFall {
+                0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+                100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+            }
+            @keyframes pulse-glow {
+                0%, 100% { box-shadow: 0 0 20px rgba(99, 102, 241, 0.5); }
+                50% { box-shadow: 0 0 40px rgba(99, 102, 241, 0.8), 0 0 60px rgba(168, 85, 247, 0.4); }
+            }
+            @keyframes float {
+                0%, 100% { transform: translateY(0); }
+                50% { transform: translateY(-10px); }
+            }
+            @keyframes shimmer {
+                0% { background-position: -200% 0; }
+                100% { background-position: 200% 0; }
+            }
+            @keyframes cardEntrance {
+                from { opacity: 0; transform: translateY(30px) scale(0.9); }
+                to { opacity: 1; transform: translateY(0) scale(1); }
+            }
+        `;
+        document.head.appendChild(style);
 
         window.toggleLanguage = () => {
             currentLang = currentLang === 'ar' ? 'en' : 'ar';
@@ -119,16 +271,50 @@
         const initRoomListener = () => {
             const roomRef = doc(db, 'games', roomId);
             onSnapshot(roomRef, (docSnap) => {
+                connectionStatus = 'connected';
+                updateConnectionUI();
+                
                 if (!docSnap.exists()) {
-                    setDoc(roomRef, { p1:"", p2:"", p3:"", p4:"", chat:[], open:false, votes: [] });
+                    setDoc(roomRef, { 
+                        p1:"", p2:"", p3:"", p4:"", 
+                        p1Points:0, p2Points:0, p3Points:0, p4Points:0,
+                        chat:[], open:false, votes: [],
+                        totalRounds: 0
+                    });
                     return;
                 }
                 const data = docSnap.data();
                 updateLobbyUI(data);
                 if (playerRole) updateGameArena(data);
                 handleVoteModalUI(data);
+                updateStatsUI(data);
+            }, (error) => {
+                connectionStatus = 'disconnected';
+                updateConnectionUI();
             });
         };
+
+        function updateConnectionUI() {
+            const indicator = document.getElementById('connectionIndicator');
+            if (!indicator) return;
+            const t = translations[currentLang];
+            if (connectionStatus === 'connected') {
+                indicator.innerHTML = `<span class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span><span class="text-[10px] font-bold text-emerald-400">${t.connected}</span>`;
+            } else if (connectionStatus === 'disconnected') {
+                indicator.innerHTML = `<span class="w-2 h-2 bg-red-400 rounded-full"></span><span class="text-[10px] font-bold text-red-400">${t.disconnected}</span>`;
+            } else {
+                indicator.innerHTML = `<span class="w-2 h-2 bg-amber-400 rounded-full animate-pulse"></span><span class="text-[10px] font-bold text-amber-400">${t.connecting}</span>`;
+            }
+        }
+
+        function updateStatsUI(data) {
+            const onlineCount = [data.p1Id, data.p2Id, data.p3Id, data.p4Id].filter(Boolean).length;
+            const onlineEl = document.getElementById('onlineCount');
+            if (onlineEl) onlineEl.textContent = onlineCount;
+            
+            const roundsEl = document.getElementById('roundsCount');
+            if (roundsEl) roundsEl.textContent = data.totalRounds || 0;
+        }
 
         window.addEventListener('beforeunload', async () => {
             if (playerRole && playerRole !== 'viewer') {
@@ -145,13 +331,40 @@
             for(let i=1; i<=4; i++) {
                 const btn = document.getElementById(`p${i}Btn`);
                 const isOccupied = data[`p${i}Id`] && data[`p${i}Id`] !== currentUser?.uid;
-                btn.disabled = isOccupied;
+                const points = data[`p${i}Points`] || 0;
+                
                 if (isOccupied) {
-                    btn.className = "p-4 md:p-6 rounded-3xl theme-panel opacity-50 cursor-not-allowed border border-white/5";
-                    btn.innerHTML = `<span class="text-[10px] opacity-60">${data[`p${i}Name`] || t['p'+i]}</span><br><span class="text-[8px] text-red-500">${t.occupied}</span>`;
+                    btn.disabled = true;
+                    btn.className = "relative overflow-hidden p-6 rounded-2xl bg-slate-800/60 backdrop-blur-xl border border-white/5 cursor-not-allowed opacity-60 transition-all duration-300";
+                    btn.innerHTML = `
+                        <div class="absolute inset-0 bg-gradient-to-br from-indigo-600/10 to-purple-600/10"></div>
+                        <div class="relative z-10">
+                            <span class="text-sm font-bold text-slate-300 block">${data[`p${i}Name`] || t['p'+i]}</span>
+                            <span class="text-[10px] text-rose-400 font-bold uppercase tracking-wider">${t.occupied}</span>
+                            ${points > 0 ? `<div class="mt-2 text-xs text-amber-400 font-bold">${points} pts</div>` : ''}
+                        </div>
+                    `;
                 } else {
-                    btn.className = `p-4 md:p-6 rounded-3xl transition-all hover:scale-105 active:scale-95 shadow-xl font-black text-white ${i%2==0 ? 'bg-purple-600' : 'bg-indigo-600'}`;
-                    btn.innerHTML = `${t['p'+i]} <span class="block w-2 h-2 bg-green-400 rounded-full mx-auto mt-1 animate-pulse"></span>`;
+                    btn.disabled = false;
+                    const gradient = i % 2 === 0 
+                        ? 'from-purple-600 via-violet-600 to-purple-700' 
+                        : 'from-indigo-600 via-blue-600 to-indigo-700';
+                    btn.className = `relative overflow-hidden p-6 rounded-2xl bg-gradient-to-br ${gradient} transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-indigo-500/30 active:scale-95 cursor-pointer group`;
+                    btn.innerHTML = `
+                        <div class="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-all duration-300"></div>
+                        <div class="relative z-10 flex flex-col items-center gap-2">
+                            <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-sm">
+                                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                                </svg>
+                            </div>
+                            <span class="text-sm font-bold text-white">${t['p'+i]}</span>
+                            <span class="flex items-center gap-1.5">
+                                <span class="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span>
+                                <span class="text-[10px] text-white/70 font-medium">${t.empty}</span>
+                            </span>
+                        </div>
+                    `;
                 }
             }
         }
@@ -165,8 +378,12 @@
             }
             const saveBtn = document.querySelector('[onclick="updateStoredName()"]');
             const originalText = saveBtn.innerText;
-            saveBtn.innerText = currentLang === 'ar' ? "✓ تم الحفظ" : "✓ SAVED";
-            setTimeout(() => saveBtn.innerText = originalText, 2000);
+            saveBtn.innerText = currentLang === 'ar' ? "تم الحفظ" : "SAVED";
+            saveBtn.classList.add('bg-emerald-600');
+            setTimeout(() => {
+                saveBtn.innerText = originalText;
+                saveBtn.classList.remove('bg-emerald-600');
+            }, 2000);
         };
 
         window.setupPlayer = async (role) => {
@@ -182,13 +399,18 @@
             }
             document.getElementById('lobbySection').classList.add('hidden');
             document.getElementById('arenaSection').classList.remove('hidden');
+            document.getElementById('arenaSection').style.animation = 'cardEntrance 0.6s ease-out';
             if (role === 'viewer') document.getElementById('mySecretBox').classList.add('hidden');
             updateSendButtonUI();
         };
 
         window.exitToLobby = async () => {
             if (playerRole && playerRole !== 'viewer') {
-                await updateDoc(doc(db, 'games', roomId), { [`p${playerRole}Id`]: "", [`p${playerRole}`]: "" });
+                await updateDoc(doc(db, 'games', roomId), { 
+                    [`p${playerRole}Id`]: "", 
+                    [`p${playerRole}`]: "",
+                    [`p${playerRole}Reveal`]: false
+                });
             }
             playerRole = null;
             document.getElementById('arenaSection').classList.add('hidden');
@@ -201,7 +423,7 @@
             const reader = new FileReader();
             reader.onload = (event) => {
                 const img = new Image();
-                img.onload = () => {
+                img.onload = async () => {
                     const canvas = document.createElement('canvas');
                     const scale = 500 / img.width;
                     canvas.width = 500;
@@ -209,7 +431,14 @@
                     canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
                     const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
                     lastLoadedImage = dataUrl;
-                    updateDoc(doc(db, 'games', roomId), { [`p${playerRole}`]: dataUrl });
+                    await updateDoc(doc(db, 'games', roomId), { [`p${playerRole}`]: dataUrl });
+                    
+                    // Visual feedback
+                    const btn = document.querySelector('[onclick^="document.getElementById(\'file\')"]');
+                    if (btn) {
+                        btn.classList.add('ring-2', 'ring-emerald-400');
+                        setTimeout(() => btn.classList.remove('ring-2', 'ring-emerald-400'), 2000);
+                    }
                 };
                 img.src = event.target.result;
             };
@@ -222,11 +451,18 @@
             lastLoadedImage = null;
             await updateDoc(doc(db, 'games', roomId), { [`p${playerRole}`]: val });
             document.getElementById('cardInput').value = "";
+            
+            // Visual feedback
+            const saveBtn = document.querySelector('[onclick="saveTextCard()"]');
+            saveBtn.classList.add('bg-emerald-600');
+            setTimeout(() => saveBtn.classList.remove('bg-emerald-600'), 1000);
         };
 
         window.toggleEmojiPicker = () => {
             const picker = document.getElementById('emojiPicker');
             picker.classList.toggle('hidden');
+            picker.classList.toggle('scale-95');
+            picker.classList.toggle('scale-100');
         };
 
         window.addEmoji = (emoji) => {
@@ -250,96 +486,117 @@
 
         function updateGameArena(data) {
             const t = translations[currentLang];
-            const playerNames = [];
-            for(let i=1; i<=4; i++) {
-                if(data[`p${i}Name`]) playerNames.push(data[`p${i}Name`]);
-            }
-
             if (playerRole !== 'viewer') {
                 const val = lastLoadedImage || data[`p${playerRole}`];
                 const el = document.getElementById('myCardContent');
                 
                 if (val && val.startsWith('data:image')) {
-                    el.innerHTML = `<img src="${val}" class="w-full h-full object-contain" />`;
+                    el.innerHTML = `<img src="${val}" class="w-full h-full object-contain p-2" />`;
                 } else if (val && val.trim() !== "") {
-                    el.innerHTML = `<div class="flex items-center justify-center h-full p-4 text-center"><span class="text-2xl font-black text-slate-800 break-all uppercase">${val}</span></div>`;
+                    el.innerHTML = `<div class="flex items-center justify-center h-full p-4 text-center">
+                        <span class="text-2xl font-black text-slate-800 break-all uppercase tracking-wide">${val}</span>
+                    </div>`;
                 } else {
                     el.innerHTML = `
-                        <div class="flex flex-col items-center justify-center h-full p-4 text-center animate-pulse">
-                            <span class="text-4xl mb-2">❓</span>
-                            <span class="text-xs font-black text-slate-400 uppercase tracking-widest">${t.emptyCardMsg}</span>
+                        <div class="flex flex-col items-center justify-center h-full p-4 text-center">
+                            <div class="w-16 h-16 rounded-2xl bg-slate-200 flex items-center justify-center mb-3">
+                                <svg class="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                                </svg>
+                            </div>
+                            <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">${t.emptyCardMsg}</span>
                         </div>`;
                 }
 
                 const isRevealedToPublic = data[`p${playerRole}Reveal`] || false;
-                document.getElementById('revealToggle').innerText = isRevealedToPublic ? t.hideFromOpponent : t.showToOpponent;
+                const revealBtn = document.getElementById('revealToggle');
+                revealBtn.innerText = isRevealedToPublic ? t.hideFromOpponent : t.showToOpponent;
+                revealBtn.className = isRevealedToPublic 
+                    ? "bg-rose-600 text-white text-[10px] px-4 py-2 rounded-xl font-bold uppercase tracking-wider transition-all hover:bg-rose-500"
+                    : "bg-indigo-600 text-white text-[10px] px-4 py-2 rounded-xl font-bold uppercase tracking-wider transition-all hover:bg-indigo-500";
                 
+                const flipCard = document.getElementById('myFlipCard');
                 if (data.open || isRevealedToPublic || isLocalPreviewOpen) {
-                    document.getElementById('myFlipCard').classList.add('is-flipped');
+                    flipCard.classList.add('is-flipped');
                 } else {
-                    document.getElementById('myFlipCard').classList.remove('is-flipped');
+                    flipCard.classList.remove('is-flipped');
                 }
             }
 
             const grid = document.getElementById('opponentsGrid');
             grid.innerHTML = '';
+            
+            let opponentCount = 0;
             for(let i=1; i<=4; i++) {
                 if (i === playerRole || !data[`p${i}Id`]) continue;
+                opponentCount++;
                 const val = data[`p${i}`];
                 const reveal = data[`p${i}Reveal`] || data.open;
                 const isImg = val?.startsWith('data:image');
                 const pName = data[`p${i}Name`] || `Player ${i}`;
+                const pPoints = data[`p${i}Points`] || 0;
                 
                 grid.innerHTML += `
-                    <div class="theme-panel p-4 rounded-[2rem] flex flex-col items-center animate-in border border-white/5">
-                        <div class="mb-2 bg-black/30 px-3 py-1 rounded-full flex items-center gap-2">
-                             <span class="text-[10px] font-black text-indigo-400 uppercase">${pName}</span>
-                             <span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
-                        </div>
-                        <div class="perspective w-full aspect-[3/4] max-w-[200px] mx-auto">
-                            <div class="card-inner ${reveal ? 'is-flipped' : ''}">
-                                <div class="card-face card-front shadow-xl bg-slate-900 border border-white/10">
-                                    <span class="text-4xl opacity-20">🕵️‍♂️</span>
+                    <div class="relative group" style="animation: cardEntrance 0.4s ease-out ${opponentCount * 0.1}s both">
+                        <div class="absolute -inset-0.5 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-3xl blur opacity-30 group-hover:opacity-50 transition-opacity"></div>
+                        <div class="relative bg-slate-900/80 backdrop-blur-xl p-5 rounded-3xl flex flex-col items-center border border-white/10">
+                            <div class="mb-3 flex items-center justify-between w-full">
+                                <div class="flex items-center gap-2">
+                                    <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                                        <span class="text-xs font-black text-white">${i}</span>
+                                    </div>
+                                    <span class="text-sm font-bold text-white">${pName}</span>
                                 </div>
-                                <div class="card-face card-back overflow-hidden border-4 border-indigo-500 shadow-2xl">
-                                    ${reveal && val ? (isImg ? `<img src="${val}" class="w-full h-full object-contain p-1" />` : `<div class="p-2 text-center flex items-center justify-center h-full"><span class="text-lg font-black text-slate-800 uppercase break-all">${val}</span></div>`) : ''}
+                                <span class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
+                            </div>
+                            
+                            <div class="perspective w-full aspect-[3/4] max-w-[180px] mx-auto">
+                                <div class="card-inner ${reveal ? 'is-flipped' : ''}">
+                                    <div class="card-face card-front shadow-2xl">
+                                        <div class="absolute inset-0 bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 rounded-2xl"></div>
+                                        <div class="relative flex flex-col items-center justify-center h-full">
+                                            <div class="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center mb-2">
+                                                <svg class="w-6 h-6 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                                </svg>
+                                            </div>
+                                            <span class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Hidden</span>
+                                        </div>
+                                    </div>
+                                    <div class="card-face card-back overflow-hidden shadow-2xl border-2 border-indigo-400/50">
+                                        ${reveal && val ? (isImg 
+                                            ? `<img src="${val}" class="w-full h-full object-contain p-2" />` 
+                                            : `<div class="p-3 text-center flex items-center justify-center h-full bg-white"><span class="text-lg font-black text-slate-800 uppercase break-all">${val}</span></div>`) 
+                                            : `<div class="flex items-center justify-center h-full bg-slate-100"><span class="text-slate-400">?</span></div>`}
+                                    </div>
                                 </div>
                             </div>
+                            
+                            ${pPoints > 0 ? `
+                                <div class="mt-3 px-3 py-1.5 rounded-full bg-amber-500/20 border border-amber-500/30">
+                                    <span class="text-xs font-bold text-amber-400">${pPoints} pts</span>
+                                </div>
+                            ` : ''}
                         </div>
                     </div>
                 `;
             }
 
-            // --- Updated Chat UI with Tagging ---
             const log = document.getElementById('clueLog');
-            log.innerHTML = (data.chat || []).slice(-30).reverse().map(m => {
-                let msgText = m.text;
-                // Highlight player names (Tagging)
-                playerNames.forEach(name => {
-                    if (name.length > 2) {
-                        const regex = new RegExp(`(${name})`, 'gi');
-                        msgText = msgText.replace(regex, `<span class="bg-indigo-500/30 text-indigo-300 px-1.5 py-0.5 rounded-md border border-indigo-500/20">@$1</span>`);
-                    }
-                });
+            const messages = (data.chat || []).slice(-30).reverse();
+            log.innerHTML = messages.map((m, idx) => `
+                <div class="mb-3 p-4 rounded-2xl ${m.isCorrect 
+                    ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white w-full text-center font-black animate-bounce shadow-lg shadow-emerald-500/30 border border-emerald-400/30' 
+                    : (m.sender === playerRole ? 'bg-indigo-600/30 ml-auto border border-indigo-400/20' : 'bg-white/5 border border-white/5')} 
+                    max-w-[85%] transition-all duration-300" style="animation: cardEntrance 0.3s ease-out ${idx * 0.05}s both">
+                    <p class="text-[9px] opacity-70 uppercase font-bold mb-1.5 tracking-wider">${m.senderName || 'Anonymous'}</p>
+                    <p class="text-sm font-semibold leading-relaxed">${m.text}</p>
+                    ${m.isCorrect ? `<div class="mt-2 text-xs font-bold uppercase tracking-wider">${t.correctGuess}</div>` : ''}
+                </div>
+            `).join('');
 
-                const isMe = m.sender === playerRole;
-                const bubbleClass = m.isCorrect 
-                    ? 'bg-gradient-to-br from-green-500 to-emerald-700 text-white w-full text-center font-black animate-bounce shadow-lg shadow-green-500/20 border-green-400/30' 
-                    : (isMe ? 'bg-indigo-600/60 ml-auto border-indigo-400/20' : 'bg-white/5 border-white/10');
-
-                return `
-                    <div class="mb-3 p-3.5 rounded-[1.5rem] ${bubbleClass} max-w-[85%] border transition-all hover:scale-[1.02]">
-                        <div class="flex justify-between items-center mb-1.5">
-                            <p class="text-[9px] opacity-70 uppercase font-black tracking-tighter">${m.senderName || 'Anonymous'}</p>
-                            ${m.isCorrect ? '<span class="text-[9px] bg-white/20 px-2 py-0.5 rounded-full">CORRECT</span>' : ''}
-                        </div>
-                        <p class="text-xs font-bold leading-relaxed break-words">${msgText}</p>
-                    </div>
-                `;
-            }).join('');
-
-            document.getElementById('revealBtn').style.display = data.open ? 'none' : 'block';
-            document.getElementById('resetBtn').style.display = data.open ? 'block' : 'none';
+            document.getElementById('revealBtn').style.display = data.open ? 'none' : 'flex';
+            document.getElementById('resetBtn').style.display = data.open ? 'flex' : 'none';
         }
 
         window.sendClue = async () => {
@@ -349,12 +606,28 @@
             const snap = await getDoc(doc(db, 'games', roomId));
             const data = snap.data();
             let isCorrect = false;
+            
             for(let i=1; i<=4; i++) {
                 if (i === playerRole) continue;
-                if (data[`p${i}`] && !data[`p${i}`].startsWith('data:image') && text.toLowerCase() === data[`p${i}`].toLowerCase()) isCorrect = true;
+                if (data[`p${i}`] && !data[`p${i}`].startsWith('data:image') && text.toLowerCase() === data[`p${i}`].toLowerCase()) {
+                    isCorrect = true;
+                    // Award point to current player
+                    const currentPoints = data[`p${playerRole}Points`] || 0;
+                    await updateDoc(doc(db, 'games', roomId), {
+                        [`p${playerRole}Points`]: currentPoints + 1
+                    });
+                    createConfetti();
+                }
             }
+            
             await updateDoc(doc(db, 'games', roomId), {
-                chat: arrayUnion({ text, sender: playerRole, senderName: data[`p${playerRole}Name`] || playerRole, isCorrect, time: Date.now() }),
+                chat: arrayUnion({ 
+                    text, 
+                    sender: playerRole, 
+                    senderName: data[`p${playerRole}Name`] || playerRole, 
+                    isCorrect, 
+                    time: Date.now() 
+                }),
                 open: isCorrect || data.open
             });
             input.value = '';
@@ -387,8 +660,10 @@
                     open: true, 
                     p1Reveal:true, p2Reveal:true, p3Reveal:true, p4Reveal:true,
                     votingActive: false,
-                    votes: []
+                    votes: [],
+                    totalRounds: (data.totalRounds || 0) + 1
                 });
+                createConfetti();
             } else {
                 await updateDoc(doc(db, 'games', roomId), { votes: newVotes });
             }
@@ -398,27 +673,52 @@
             const modal = document.getElementById('voteModal');
             if (data.votingActive && !data.open) {
                 modal.classList.remove('hidden');
+                modal.classList.add('flex');
                 let activeCount = 0;
                 for(let i=1; i<=4; i++) if(data[`p${i}Id`]) activeCount++;
                 document.getElementById('voteProgressText').innerText = `${(data.votes || []).length} / ${activeCount}`;
+                
+                // Check if current user has voted
+                const hasVoted = (data.votes || []).includes(currentUser?.uid);
+                document.getElementById('approveVoteBtn').disabled = hasVoted;
+                document.getElementById('approveVoteBtn').classList.toggle('opacity-50', hasVoted);
             } else {
                 modal.classList.add('hidden');
+                modal.classList.remove('flex');
             }
         }
 
         window.resetArena = async () => {
             const roomRef = doc(db, 'games', roomId);
+            const snap = await getDoc(roomRef);
+            const data = snap.data();
+            
             lastLoadedImage = null;
             isLocalPreviewOpen = false;
             await updateDoc(roomRef, { 
                 p1:"", p2:"", p3:"", p4:"", 
                 chat:[], open:false, 
                 p1Reveal:false, p2Reveal:false, p3Reveal:false, p4Reveal:false,
-                votingActive: false, votes: []
+                votingActive: false, 
+                votes: [],
+                totalRounds: (data.totalRounds || 0) + 1
             });
         };
 
-        window.fullReset = () => setDoc(doc(db, 'games', roomId), { p1:"", p2:"", p3:"", p4:"", chat:[], open:false, p1Id:"", p2Id:"", p3Id:"", p4Id:"", p1Reveal:false, p2Reveal:false, p3Reveal:false, p4Reveal:false, votingActive: false, votes: [] }).then(() => location.reload());
+        window.fullReset = async () => {
+            if (confirm(currentLang === 'ar' ? 'هل أنت متأكد من إعادة تعيين كل شيء؟' : 'Reset all data?')) {
+                await setDoc(doc(db, 'games', roomId), { 
+                    p1:"", p2:"", p3:"", p4:"", 
+                    p1Id:"", p2Id:"", p3Id:"", p4Id:"",
+                    p1Name:"", p2Name:"", p3Name:"", p4Name:"",
+                    p1Points:0, p2Points:0, p3Points:0, p4Points:0,
+                    p1Reveal:false, p2Reveal:false, p3Reveal:false, p4Reveal:false,
+                    chat:[], open:false, votingActive: false, votes: [],
+                    totalRounds: 0
+                });
+                location.reload();
+            }
+        };
 
         function updateSendButtonUI() {
             const t = translations[currentLang];
@@ -435,198 +735,395 @@
             }
         }
 
+        // Initialize
         onAuthStateChanged(auth, async (user) => {
             if (user) { 
                 currentUser = user; 
                 initRoomListener();
                 const saved = localStorage.getItem('cardx_username');
                 if(saved) document.getElementById('userNameInput').value = saved;
-            } else { await signInAnonymously(auth); }
+            } else { 
+                await signInAnonymously(auth); 
+            }
         });
 
         window.onload = () => {
             const savedTheme = localStorage.getItem('cardx_theme') || 'dark';
-            document.body.className = savedTheme + '-theme p-4 md:p-8 min-h-screen flex flex-col items-center';
+            document.body.className = savedTheme + '-theme min-h-screen flex flex-col items-center';
+            
+            // Initialize particles
+            const canvas = document.getElementById('particleCanvas');
+            if (canvas) new ParticleSystem(canvas);
+            
             applyTranslations();
         };
     </script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700;800&family=Noto+Sans+Arabic:wght@400;700;900&display=swap');
+        * { box-sizing: border-box; }
         
         :root {
-            --bg-color: #030712;
-            --text-color: #f8fafc;
-            --panel-bg: rgba(15, 23, 42, 0.7);
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --accent-1: #6366f1;
+            --accent-2: #a855f7;
+            --accent-3: #06b6d4;
         }
 
         body.dark-theme {
-            --bg-color: #030712;
-            --text-color: #f8fafc;
-            --panel-bg: rgba(15, 23, 42, 0.7);
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
         }
 
         body.light-theme {
-            --bg-color: #f1f5f9;
-            --text-color: #0f172a;
-            --panel-bg: rgba(255, 255, 255, 0.8);
+            --bg-primary: #f8fafc;
+            --bg-secondary: #e2e8f0;
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
         }
 
-        body { background: var(--bg-color); color: var(--text-color); font-family: 'Plus Jakarta Sans', 'Noto Sans Arabic', sans-serif; transition: all 0.3s ease; }
-        .theme-panel { background: var(--panel-bg); backdrop-filter: blur(20px); }
-
-        .logo-animate { 
-            background: linear-gradient(to right, #6366f1, #a855f7, #ec4899, #6366f1); 
-            background-size: 200% auto; 
-            -webkit-background-clip: text; 
-            -webkit-text-fill-color: transparent; 
-            animation: gradientMove 3s linear infinite; 
-            font-weight: 900;
-            font-style: italic;
-            display: inline-block;
-        }
-        
-        .logo-container:hover .logo-svg {
-            transform: scale(1.2) rotate(360deg);
-            color: #ec4899;
-        }
-        .logo-svg {
-            transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        body { 
+            background: var(--bg-primary); 
+            color: var(--text-primary); 
+            font-family: 'Rajdhani', 'Noto Sans Arabic', sans-serif;
+            transition: all 0.4s ease;
+            overflow-x: hidden;
         }
 
-        @keyframes gradientMove { to { background-position: 200% center; } }
-        
-        .perspective { perspective: 1200px; }
-        .card-inner { transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1); transform-style: preserve-3d; width: 100%; height: 100%; position: relative; }
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        body.light-theme .glass-panel {
+            background: rgba(255, 255, 255, 0.8);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .logo-text {
+            background: linear-gradient(135deg, #6366f1 0%, #a855f7 25%, #06b6d4 50%, #a855f7 75%, #6366f1 100%);
+            background-size: 300% 300%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: gradientMove 4s ease infinite;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+
+        @keyframes gradientMove {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+
+        .perspective { perspective: 1500px; }
+        .card-inner { 
+            transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1); 
+            transform-style: preserve-3d; 
+            width: 100%; 
+            height: 100%; 
+            position: relative; 
+        }
         .is-flipped { transform: rotateY(180deg); }
-        .card-face { backface-visibility: hidden; position: absolute; width: 100%; height: 100%; border-radius: 1.5rem; display: flex; align-items: center; justify-content: center; }
-        .card-back { transform: rotateY(180deg); background: #ffffff; color: #0f172a; }
-        .card-front { background: linear-gradient(135deg, #1e1b4b, #0f172a); }
-        .modal-overlay { background: rgba(0,0,0,0.85); backdrop-filter: blur(10px); }
-        .custom-scroll::-webkit-scrollbar { width: 3px; }
-        .custom-scroll::-webkit-scrollbar-thumb { background: #6366f1; border-radius: 10px; }
+        .card-face { 
+            backface-visibility: hidden; 
+            position: absolute; 
+            width: 100%; 
+            height: 100%; 
+            border-radius: 1rem; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            overflow: hidden;
+        }
+        .card-back { 
+            transform: rotateY(180deg); 
+            background: linear-gradient(135deg, #ffffff, #f1f5f9);
+            color: #0f172a;
+        }
+        .card-front { 
+            background: linear-gradient(135deg, #1e1b4b 0%, #0f172a 50%, #1e1b4b 100%);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+        }
+
+        .modal-overlay { 
+            background: rgba(0, 0, 0, 0.9); 
+            backdrop-filter: blur(20px);
+        }
+
+        .custom-scroll::-webkit-scrollbar { width: 4px; }
+        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+        .custom-scroll::-webkit-scrollbar-thumb { 
+            background: linear-gradient(180deg, #6366f1, #a855f7); 
+            border-radius: 10px; 
+        }
+
+        .glow-border {
+            position: relative;
+        }
+        .glow-border::before {
+            content: '';
+            position: absolute;
+            inset: -2px;
+            background: linear-gradient(135deg, #6366f1, #a855f7, #06b6d4, #a855f7, #6366f1);
+            background-size: 300% 300%;
+            border-radius: inherit;
+            z-index: -1;
+            animation: gradientMove 4s ease infinite;
+            opacity: 0.5;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #6366f1, #4f46e5);
+            transition: all 0.3s ease;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 40px -10px rgba(99, 102, 241, 0.5);
+        }
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .input-field {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+        .input-field:focus {
+            border-color: #6366f1;
+            box-shadow: 0 0 20px -5px rgba(99, 102, 241, 0.3);
+            outline: none;
+        }
+
+        body.light-theme .input-field {
+            background: rgba(255, 255, 255, 0.5);
+            border-color: rgba(0, 0, 0, 0.1);
+        }
+
+        @media (max-width: 768px) {
+            .logo-text { font-size: 1.5rem; }
+        }
     </style>
 </head>
-<body class="dark-theme p-4 md:p-8 min-h-screen flex flex-col items-center">
+<body class="dark-theme min-h-screen flex flex-col items-center">
+    <!-- Particle Canvas -->
+    <canvas id="particleCanvas" class="fixed inset-0 pointer-events-none z-0"></canvas>
+    
+    <!-- Ambient Glow -->
+    <div class="fixed top-0 left-1/4 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl pointer-events-none"></div>
+    <div class="fixed bottom-0 right-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-3xl pointer-events-none"></div>
+
     <!-- Vote Modal -->
-    <div id="voteModal" class="hidden fixed inset-0 z-[100] modal-overlay flex items-center justify-center p-4">
-        <div class="theme-panel p-8 max-w-sm w-full text-center border border-indigo-500/30 rounded-3xl">
-            <div class="text-5xl mb-4">🗳️</div>
-            <h2 data-t="voteTitle" class="text-2xl font-black mb-2 text-indigo-400 italic">Reveal Request!</h2>
-            <p data-t="voteDesc" class="text-xs opacity-60 mb-6 font-bold">All players must agree to reveal cards.</p>
-            <div class="bg-black/40 p-4 rounded-2xl mb-6 shadow-inner">
-                <span id="voteProgressText" class="text-3xl font-black text-white italic">0 / 0</span>
+    <div id="voteModal" class="hidden fixed inset-0 z-[100] modal-overlay items-center justify-center p-4">
+        <div class="glass-panel p-8 max-w-sm w-full text-center rounded-3xl glow-border">
+            <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center">
+                <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+            <h2 data-t="voteTitle" class="text-2xl font-bold mb-2 text-white">Reveal Request</h2>
+            <p data-t="voteDesc" class="text-sm opacity-60 mb-6 font-medium">All players must agree</p>
+            <div class="bg-black/40 p-6 rounded-2xl mb-6">
+                <span id="voteProgressText" class="text-4xl font-bold text-white">0 / 0</span>
             </div>
             <div class="flex gap-3">
-                <button onclick="castVote(true)" data-t="approve" class="flex-1 bg-green-600 p-3 rounded-xl font-black text-xs uppercase text-white shadow-lg">Approve ✅</button>
-                <button onclick="castVote(false)" data-t="reject" class="flex-1 bg-red-600 p-3 rounded-xl font-black text-xs uppercase text-white shadow-lg">Reject ❌</button>
+                <button id="approveVoteBtn" onclick="castVote(true)" data-t="approve" class="flex-1 bg-emerald-600 hover:bg-emerald-500 p-4 rounded-xl font-bold text-sm uppercase text-white transition-all">Approve</button>
+                <button onclick="castVote(false)" data-t="reject" class="flex-1 bg-rose-600 hover:bg-rose-500 p-4 rounded-xl font-bold text-sm uppercase text-white transition-all">Reject</button>
             </div>
         </div>
     </div>
 
-    <div class="max-w-6xl w-full">
+    <div class="relative z-10 max-w-6xl w-full px-4 py-6">
         <header class="flex flex-wrap justify-between items-center mb-8 gap-4">
-            <div class="flex items-center gap-3 logo-container group cursor-pointer">
-                <svg class="w-10 h-10 text-indigo-500 logo-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="2" y="6" width="20" height="12" rx="2"></rect>
-                    <path d="M12 12h.01"></path>
-                    <path d="M17 12h.01"></path>
-                    <path d="M7 12h.01"></path>
-                </svg>
-                <h1 id="siteLogoText" class="text-3xl md:text-5xl logo-animate tracking-tighter">CARDX ULTRA</h1>
+            <div class="flex items-center gap-4 group cursor-pointer">
+                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/30 group-hover:scale-110 transition-transform">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <rect x="2" y="6" width="20" height="12" rx="2" stroke-width="2"/>
+                        <circle cx="12" cy="12" r="1" fill="currentColor"/>
+                        <circle cx="17" cy="12" r="1" fill="currentColor"/>
+                        <circle cx="7" cy="12" r="1" fill="currentColor"/>
+                    </svg>
+                </div>
+                <h1 id="siteLogoText" class="text-3xl md:text-4xl logo-text">CARDX ULTRA</h1>
             </div>
-            <div class="flex gap-2">
-                <button onclick="toggleTheme()" class="theme-panel border border-white/10 p-2.5 rounded-xl transition-all hover:bg-indigo-500/20">
-                    <span class="dark:hidden">🌙</span>
-                    <span class="hidden dark:inline">☀️</span>
+            
+            <div class="flex items-center gap-3">
+                <!-- Connection Status -->
+                <div id="connectionIndicator" class="flex items-center gap-2 px-3 py-2 rounded-lg bg-black/20">
+                    <span class="w-2 h-2 bg-amber-400 rounded-full animate-pulse"></span>
+                    <span class="text-[10px] font-bold text-amber-400">Connecting...</span>
+                </div>
+                
+                <!-- Stats -->
+                <div class="hidden md:flex items-center gap-4 px-4 py-2 rounded-lg bg-black/20">
+                    <div class="flex items-center gap-2">
+                        <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        </svg>
+                        <span id="onlineCount" class="text-sm font-bold text-white">0</span>
+                    </div>
+                    <div class="w-px h-4 bg-white/20"></div>
+                    <div class="flex items-center gap-2">
+                        <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        </svg>
+                        <span id="roundsCount" class="text-sm font-bold text-white">0</span>
+                    </div>
+                </div>
+                
+                <button onclick="toggleTheme()" class="w-10 h-10 rounded-xl glass-panel flex items-center justify-center transition-all hover:scale-105">
+                    <span class="text-lg dark:hidden">🌙</span>
+                    <span class="text-lg hidden dark:inline">☀️</span>
                 </button>
-                <button onclick="toggleLanguage()" data-t="langBtn" class="theme-panel border border-white/10 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:border-indigo-500 transition-colors">العربية</button>
-                <button onclick="fullReset()" data-t="resetRoom" class="text-red-500/70 hover:text-red-500 text-[10px] font-black uppercase transition-colors px-2">Reset</button>
+                <button onclick="toggleLanguage()" data-t="langBtn" class="px-4 h-10 rounded-xl glass-panel text-xs font-bold uppercase tracking-wider hover:bg-white/10 transition-all">
+                    العربية
+                </button>
+                <button onclick="fullReset()" data-t="resetRoom" class="w-10 h-10 rounded-xl bg-rose-600/20 text-rose-400 hover:bg-rose-600 hover:text-white flex items-center justify-center transition-all" title="Reset Room">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                </button>
             </div>
         </header>
 
-        <!-- Lobby -->
+        <!-- Lobby Section -->
         <div id="lobbySection" class="flex flex-col items-center py-10">
-            <div class="theme-panel p-8 md:p-12 rounded-[3.5rem] text-center w-full max-w-2xl border-b-[12px] border-indigo-600/30 shadow-2xl">
-                <p data-t="setupDesc" class="opacity-50 mb-8 text-[10px] font-black uppercase tracking-[0.3em]">Choose Your Legend</p>
-                <div class="flex flex-col md:flex-row gap-3 mb-10">
-                    <input id="userNameInput" data-t="namePlaceholder" class="flex-1 bg-black/40 p-5 rounded-2xl border border-white/10 outline-none focus:border-indigo-500 text-center font-black transition-all shadow-inner">
-                    <button onclick="updateStoredName()" data-t="saveName" class="bg-indigo-600 px-8 py-4 rounded-2xl font-black text-xs shadow-xl active:scale-95 transition-all text-white hover:bg-indigo-500">SAVE NAME</button>
+            <div class="glass-panel p-8 md:p-12 rounded-3xl w-full max-w-2xl glow-border">
+                <div class="text-center mb-8">
+                    <p data-t="setupDesc" class="text-sm opacity-60 font-semibold uppercase tracking-widest">Pick your name and join the arena</p>
                 </div>
-                <div class="grid grid-cols-2 gap-5 mb-6">
-                    <button id="p1Btn" onclick="setupPlayer(1)" class="p-6 rounded-3xl bg-indigo-600 font-black text-white hover:shadow-indigo-500/40">Player 1</button>
-                    <button id="p2Btn" onclick="setupPlayer(2)" class="p-6 rounded-3xl bg-purple-600 font-black text-white hover:shadow-purple-500/40">Player 2</button>
-                    <button id="p3Btn" onclick="setupPlayer(3)" class="p-6 rounded-3xl bg-indigo-600 font-black text-white hover:shadow-indigo-500/40">Player 3</button>
-                    <button id="p4Btn" onclick="setupPlayer(4)" class="p-6 rounded-3xl bg-purple-600 font-black text-white hover:shadow-purple-500/40">Player 4</button>
+                
+                <div class="flex flex-col md:flex-row gap-3 mb-8">
+                    <input id="userNameInput" data-t="namePlaceholder" class="flex-1 input-field p-4 rounded-xl text-center font-bold text-white placeholder-white/40">
+                    <button onclick="updateStoredName()" data-t="saveName" class="btn-primary px-8 py-4 rounded-xl font-bold text-sm text-white uppercase tracking-wider">
+                        SAVE
+                    </button>
                 </div>
-                <button onclick="setupPlayer('viewer')" data-t="viewer" class="w-full theme-panel p-5 rounded-3xl font-black opacity-60 border border-white/5 uppercase text-xs hover:opacity-100 transition-opacity">Spectator Mode 👀</button>
+                
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <button id="p1Btn" onclick="setupPlayer(1)" class="p-6 rounded-2xl bg-gradient-to-br from-indigo-600 via-blue-600 to-indigo-700 transition-all hover:scale-105 hover:shadow-2xl hover:shadow-indigo-500/30 active:scale-95">
+                        <span class="text-sm font-bold text-white">Player 1</span>
+                    </button>
+                    <button id="p2Btn" onclick="setupPlayer(2)" class="p-6 rounded-2xl bg-gradient-to-br from-purple-600 via-violet-600 to-purple-700 transition-all hover:scale-105 hover:shadow-2xl hover:shadow-purple-500/30 active:scale-95">
+                        <span class="text-sm font-bold text-white">Player 2</span>
+                    </button>
+                    <button id="p3Btn" onclick="setupPlayer(3)" class="p-6 rounded-2xl bg-gradient-to-br from-indigo-600 via-blue-600 to-indigo-700 transition-all hover:scale-105 hover:shadow-2xl hover:shadow-indigo-500/30 active:scale-95">
+                        <span class="text-sm font-bold text-white">Player 3</span>
+                    </button>
+                    <button id="p4Btn" onclick="setupPlayer(4)" class="p-6 rounded-2xl bg-gradient-to-br from-purple-600 via-violet-600 to-purple-700 transition-all hover:scale-105 hover:shadow-2xl hover:shadow-purple-500/30 active:scale-95">
+                        <span class="text-sm font-bold text-white">Player 4</span>
+                    </button>
+                </div>
+                
+                <button onclick="setupPlayer('viewer')" data-t="viewer" class="w-full p-5 rounded-2xl glass-panel font-bold text-sm uppercase tracking-wider hover:bg-white/10 transition-all border border-white/10">
+                    Spectator Mode
+                </button>
             </div>
         </div>
 
-        <!-- Arena -->
+        <!-- Arena Section -->
         <div id="arenaSection" class="hidden space-y-6">
-            <div class="flex justify-between items-center bg-black/30 p-4 rounded-2xl border border-white/5">
-                <button onclick="exitToLobby()" data-t="exit" class="text-red-500 text-[10px] font-black uppercase px-5 py-2.5 bg-red-500/10 rounded-xl border border-red-500/20 hover:bg-red-500 hover:text-white transition-all">Back to Lobby 🚪</button>
-                <span data-t="battleActive" class="text-[10px] font-black text-indigo-400 uppercase tracking-widest animate-pulse">Live Battle Active</span>
+            <!-- Top Bar -->
+            <div class="flex justify-between items-center glass-panel p-4 rounded-2xl">
+                <button onclick="exitToLobby()" data-t="exit" class="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600/20 text-rose-400 hover:bg-rose-600 hover:text-white transition-all text-sm font-bold">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                    </svg>
+                    Exit
+                </button>
+                <div class="flex items-center gap-2">
+                    <span class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
+                    <span data-t="battleActive" class="text-xs font-bold text-emerald-400 uppercase tracking-widest">Live Battle</span>
+                </div>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 <!-- My Card Section -->
-                <div id="mySecretBox" class="lg:col-span-4 theme-panel p-6 rounded-[2.5rem] border-t-8 border-indigo-600 order-2 lg:order-1 shadow-2xl">
+                <div id="mySecretBox" class="lg:col-span-4 glass-panel p-6 rounded-3xl order-2 lg:order-1">
                     <div class="flex justify-between items-center mb-6">
-                        <h3 data-t="secretVault" class="text-xs font-black text-indigo-400 uppercase tracking-[0.2em]">Secret Vault</h3>
-                        <button id="revealToggle" onclick="toggleMyReveal()" class="bg-indigo-600 text-white text-[9px] px-4 py-2 rounded-xl font-black uppercase shadow-lg shadow-indigo-500/30 tracking-widest hover:bg-indigo-500 transition-all">Show 👀</button>
+                        <h3 data-t="secretVault" class="text-xs font-bold text-indigo-400 uppercase tracking-widest">Secret Vault</h3>
+                        <button id="revealToggle" onclick="toggleMyReveal()" class="bg-indigo-600 text-white text-[10px] px-4 py-2 rounded-xl font-bold uppercase tracking-wider hover:bg-indigo-500 transition-all">
+                            Reveal
+                        </button>
                     </div>
+                    
                     <div class="flex gap-2 mb-6">
-                        <input id="cardInput" data-t="placeholderCard" class="flex-1 bg-black/40 text-xs p-4 rounded-xl border border-white/5 outline-none focus:border-indigo-500 shadow-inner">
-                        <button onclick="saveTextCard()" data-t="save" class="bg-indigo-600 px-5 rounded-xl text-[10px] font-black text-white">SAVE</button>
-                        <button onclick="document.getElementById('file').click()" class="bg-white/5 px-4 rounded-xl text-lg hover:bg-white/10 transition-colors">📷</button>
+                        <input id="cardInput" data-t="placeholderCard" class="flex-1 input-field text-sm p-3 rounded-xl font-medium text-white placeholder-white/40">
+                        <button onclick="saveTextCard()" data-t="save" class="btn-primary px-4 rounded-xl text-xs font-bold text-white">SAVE</button>
+                        <button onclick="document.getElementById('file').click()" class="w-11 h-11 rounded-xl glass-panel flex items-center justify-center hover:bg-white/10 transition-all text-lg">
+                            📷
+                        </button>
                         <input type="file" id="file" class="hidden" accept="image/*" onchange="uploadImage(event)">
                     </div>
-                    <div class="perspective w-full aspect-[3/4] max-w-[220px] mx-auto">
-                        <div id="myFlipCard" class="card-inner cursor-pointer" onclick="handleCardClick()">
-                            <div class="card-face card-front border border-white/10 shadow-2xl">
-                                <span class="text-5xl opacity-20 filter grayscale">🃏</span>
+                    
+                    <div class="perspective w-full aspect-[3/4] max-w-[200px] mx-auto">
+                        <div id="myFlipCard" class="card-inner cursor-pointer hover:scale-105 transition-transform" onclick="handleCardClick()">
+                            <div class="card-face card-front">
+                                <div class="flex flex-col items-center">
+                                    <div class="w-16 h-16 rounded-2xl bg-white/10 flex items-center justify-center mb-2">
+                                        <span class="text-3xl">🃏</span>
+                                    </div>
+                                    <span class="text-[10px] text-white/50 font-bold uppercase tracking-widest">Tap to peek</span>
+                                </div>
                             </div>
-                            <div id="myCardContent" class="card-face card-back overflow-hidden border-4 border-indigo-600 shadow-2xl"></div>
+                            <div id="myCardContent" class="card-face card-back border-2 border-indigo-400/50"></div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Opponents Grid -->
                 <div class="lg:col-span-8 order-1 lg:order-2">
-                    <div id="opponentsGrid" class="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-5"></div>
+                    <div id="opponentsGrid" class="grid grid-cols-2 md:grid-cols-3 gap-4"></div>
                 </div>
             </div>
 
             <!-- Chat & Controls -->
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                <div class="lg:col-span-8 theme-panel p-6 rounded-[3rem] flex flex-col shadow-2xl">
-                    <div id="clueLog" class="h-56 overflow-y-auto mb-4 p-5 bg-black/40 rounded-[2rem] border border-white/5 custom-scroll shadow-inner font-medium"></div>
+                <div class="lg:col-span-8 glass-panel p-6 rounded-3xl">
+                    <div id="clueLog" class="h-64 overflow-y-auto mb-4 p-4 rounded-2xl bg-black/30 custom-scroll"></div>
                     <div class="relative flex gap-3">
-                        <button onclick="toggleEmojiPicker()" class="bg-white/5 border border-white/10 w-14 rounded-2xl text-2xl flex items-center justify-center hover:bg-white/10 transition-all">😊</button>
-                        <input id="clueInput" data-t="chatPlaceholder" class="flex-1 bg-black/40 p-4 rounded-2xl border border-white/10 outline-none focus:border-indigo-500 font-bold text-xs shadow-inner" onkeypress="if(event.key === 'Enter') sendClue()">
-                        <button id="sendClueBtn" onclick="sendClue()" data-t="send" class="bg-indigo-600 px-8 rounded-2xl font-black text-xs text-white shadow-lg shadow-indigo-500/30 hover:bg-indigo-500 transition-all">SEND</button>
+                        <button onclick="toggleEmojiPicker()" class="w-12 h-12 rounded-xl glass-panel flex items-center justify-center hover:bg-white/10 transition-all text-xl">
+                            😊
+                        </button>
+                        <input id="clueInput" data-t="chatPlaceholder" class="flex-1 input-field p-4 rounded-xl text-sm font-medium text-white placeholder-white/40">
+                        <button id="sendClueBtn" onclick="sendClue()" data-t="send" class="btn-primary px-8 rounded-xl font-bold text-sm text-white uppercase tracking-wider">
+                            SEND
+                        </button>
                         
-                        <div id="emojiPicker" class="hidden absolute bottom-20 left-0 bg-slate-900 p-4 rounded-2xl grid grid-cols-6 gap-2 border border-white/10 shadow-2xl z-50">
-                            <button onclick="addEmoji('🔥')" class="text-xl">🔥</button>
-                            <button onclick="addEmoji('👀')" class="text-xl">👀</button>
-                            <button onclick="addEmoji('🤡')" class="text-xl">🤡</button>
-                            <button onclick="addEmoji('😂')" class="text-xl">😂</button>
-                            <button onclick="addEmoji('🤔')" class="text-xl">🤔</button>
-                            <button onclick="addEmoji('✅')" class="text-xl">✅</button>
-                            <button onclick="addEmoji('❌')" class="text-xl">❌</button>
-                            <button onclick="addEmoji('💀')" class="text-xl">💀</button>
-                            <button onclick="addEmoji('🤖')" class="text-xl">🤖</button>
-                            <button onclick="addEmoji('✨')" class="text-xl">✨</button>
-                            <button onclick="addEmoji('🤫')" class="text-xl">🤫</button>
-                            <button onclick="addEmoji('🚩')" class="text-xl">🚩</button>
+                        <!-- Emoji Picker -->
+                        <div id="emojiPicker" class="hidden absolute bottom-full left-0 mb-3 glass-panel p-4 rounded-2xl grid grid-cols-5 gap-2">
+                            <button onclick="addEmoji('🔥')" class="text-2xl hover:scale-125 transition-transform p-1">🔥</button>
+                            <button onclick="addEmoji('⭐')" class="text-2xl hover:scale-125 transition-transform p-1">⭐</button>
+                            <button onclick="addEmoji('💎')" class="text-2xl hover:scale-125 transition-transform p-1">💎</button>
+                            <button onclick="addEmoji('👑')" class="text-2xl hover:scale-125 transition-transform p-1">👑</button>
+                            <button onclick="addEmoji('🚀')" class="text-2xl hover:scale-125 transition-transform p-1">🚀</button>
+                            <button onclick="addEmoji('🎭')" class="text-2xl hover:scale-125 transition-transform p-1">🎭</button>
+                            <button onclick="addEmoji('⚔️')" class="text-2xl hover:scale-125 transition-transform p-1">⚔️</button>
+                            <button onclick="addEmoji('💡')" class="text-2xl hover:scale-125 transition-transform p-1">💡</button>
+                            <button onclick="addEmoji('🍎')" class="text-2xl hover:scale-125 transition-transform p-1">🍎</button>
+                            <button onclick="addEmoji('🦁')" class="text-2xl hover:scale-125 transition-transform p-1">🦁</button>
                         </div>
                     </div>
                 </div>
-                
+
                 <div class="lg:col-span-4 flex flex-col gap-4">
-                    <button id="revealBtn" onclick="revealGame()" data-t="reveal" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 p-6 rounded-[2rem] font-black text-white shadow-xl hover:scale-[1.02] active:scale-95 transition-all text-xs tracking-widest border-b-4 border-indigo-800">REVEAL ALL 🏁</button>
-                    <button id="resetBtn" onclick="resetArena()" data-t="reset" class="w-full bg-emerald-600 p-6 rounded-[2rem] font-black text-white shadow-xl hover:scale-[1.02] active:scale-95 transition-all text-xs tracking-widest border-b-4 border-emerald-800" style="display:none;">NEW ROUND 🔄</button>
+                    <button id="revealBtn" onclick="revealGame()" data-t="reveal" class="flex items-center justify-center gap-3 btn-primary p-5 rounded-2xl font-bold text-white uppercase tracking-wider">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                        </svg>
+                        Request Reveal
+                    </button>
+                    <button id="resetBtn" onclick="resetArena()" data-t="reset" class="hidden items-center justify-center gap-3 bg-emerald-600 hover:bg-emerald-500 p-5 rounded-2xl font-bold text-white uppercase tracking-wider transition-all">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        </svg>
+                        NEW ROUND
+                    </button>
                 </div>
             </div>
         </div>
