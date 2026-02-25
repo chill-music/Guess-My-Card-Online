@@ -40,11 +40,10 @@
             musicVolume: 0.5,
             sfxVolume: 0.6,
             currentSong: null,
-            audioElement: null,
+            currentSongIndex: -1,
             
             init() {
                 this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-                this.audioElement = document.getElementById('backgroundMusic');
             },
             
             ensureContext() {
@@ -56,14 +55,11 @@
             playCardFlip() {
                 this.ensureContext();
                 
-                // Main flip whoosh
                 const osc1 = this.ctx.createOscillator();
                 const osc2 = this.ctx.createOscillator();
                 const gain1 = this.ctx.createGain();
                 const gain2 = this.ctx.createGain();
-                const filter = this.ctx.createBiquadFilter();
                 
-                // White noise for whoosh
                 const bufferSize = this.ctx.sampleRate * 0.15;
                 const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
                 const data = buffer.getChannelData(0);
@@ -86,7 +82,6 @@
                 noiseGain.gain.setValueAtTime(this.sfxVolume * 0.15, this.ctx.currentTime);
                 noiseGain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.15);
                 
-                // Tones
                 osc1.type = 'sine';
                 osc1.frequency.setValueAtTime(1200, this.ctx.currentTime);
                 osc1.frequency.exponentialRampToValueAtTime(600, this.ctx.currentTime + 0.1);
@@ -125,7 +120,6 @@
                     osc.type = type;
                     osc.frequency.setValueAtTime(freq, this.ctx.currentTime + startTime);
                     
-                    // Add vibrato
                     const vibrato = this.ctx.createOscillator();
                     const vibratoGain = this.ctx.createGain();
                     vibrato.frequency.value = 5;
@@ -147,22 +141,20 @@
                     osc.stop(this.ctx.currentTime + startTime + duration);
                 };
                 
-                // Victory melody - ascending major chord arpeggio
                 const notes = [
-                    { freq: 523.25, time: 0, dur: 0.15 },      // C5
-                    { freq: 659.25, time: 0.12, dur: 0.15 },   // E5
-                    { freq: 783.99, time: 0.24, dur: 0.15 },   // G5
-                    { freq: 1046.50, time: 0.36, dur: 0.3 },   // C6
-                    { freq: 783.99, time: 0.5, dur: 0.15 },    // G5
-                    { freq: 1046.50, time: 0.62, dur: 0.4 },   // C6
+                    { freq: 523.25, time: 0, dur: 0.15 },
+                    { freq: 659.25, time: 0.12, dur: 0.15 },
+                    { freq: 783.99, time: 0.24, dur: 0.15 },
+                    { freq: 1046.50, time: 0.36, dur: 0.3 },
+                    { freq: 783.99, time: 0.5, dur: 0.15 },
+                    { freq: 1046.50, time: 0.62, dur: 0.4 },
                 ];
                 
                 notes.forEach(note => {
                     playNote(note.freq, note.time, note.dur);
-                    playNote(note.freq * 0.5, note.time, note.dur, 'triangle'); // Octave below
+                    playNote(note.freq * 0.5, note.time, note.dur, 'triangle');
                 });
                 
-                // Shimmer effect
                 setTimeout(() => {
                     for (let i = 0; i < 5; i++) {
                         setTimeout(() => {
@@ -227,49 +219,68 @@
                 });
             },
             
-            // Music controls
-            playSong(songIndex) {
+            // Play YouTube song
+            playSong(index) {
                 const songs = document.querySelectorAll('.song-item');
                 songs.forEach(s => s.classList.remove('bg-indigo-600'));
                 
-                if (this.currentSong === songIndex) {
+                if (this.currentSongIndex === index) {
                     this.stopSong();
                     return;
                 }
                 
-                this.currentSong = songIndex;
-                const audio = this.audioElement;
-                
-                const songUrls = [
-                    'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
-                    'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
-                    'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
-                    'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
-                    'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3',
-                    'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3',
-                    'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3',
-                    'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3'
-                ];
-                
-                audio.src = songUrls[songIndex];
-                audio.volume = this.musicVolume;
-                audio.play();
-                
-                songs[songIndex].classList.add('bg-indigo-600');
+                this.currentSongIndex = index;
                 this.musicEnabled = true;
+                
+                songs[index].classList.add('bg-indigo-600');
                 
                 const musicBtn = document.getElementById('musicBtn');
                 const musicIcon = document.getElementById('musicIcon');
                 musicBtn.classList.add('bg-indigo-600');
                 musicBtn.classList.remove('bg-white/10');
                 musicIcon.classList.add('animate-pulse');
+                
+                // Show player modal
+                const playerModal = document.getElementById('youtubePlayerModal');
+                const playerContainer = document.getElementById('youtubePlayerContainer');
+                playerModal.classList.remove('hidden');
+                playerModal.classList.add('flex');
+                
+                // YouTube video IDs for popular songs
+                const videoIds = [
+                    'fJ9rUzIMcZQ',  // Queen - Bohemian Rhapsody
+                    'kJQP7kiw5Fk',  // Luis Fonsi - Despacito
+                    'JGwWNGJdvx8',  // Ed Sheeran - Shape of You
+                    'RgKAFK5djSk',  // Wiz Khalifa - See You Again
+                    '9bZkp7q19f0',  // PSY - Gangnam Style
+                    'hT_nvWreIhg',  // OneRepublic - Counting Stars
+                    'CevxZvSJLk8',  // Katy Perry - Roar
+                    'OPf0YbXqDm0',  // Mark Ronson - Uptown Funk
+                    'YQHsXMglC9A',  // Adele - Hello
+                    'hLQl3WQQoQ0',  // Adele - Someone Like You
+                    '09R8_2nJtjg',  // Maroon 5 - Sugar
+                    'pRpeEdMmmQ0',  // Shakira - Waka Waka
+                    'SlPhMPnQ58k',  // Imagine Dragons - Demons
+                    'ktvTqknDobU',  // Rihanna - Diamonds
+                    'e-ORhEE9VVg',  // Dua Lipa - Levitating
+                ];
+                
+                playerContainer.innerHTML = `
+                    <iframe 
+                        width="100%" 
+                        height="300" 
+                        src="https://www.youtube.com/embed/${videoIds[index]}?autoplay=1" 
+                        frameborder="0" 
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                        allowfullscreen
+                        class="rounded-xl"
+                    ></iframe>
+                `;
             },
             
             stopSong() {
-                this.currentSong = null;
+                this.currentSongIndex = -1;
                 this.musicEnabled = false;
-                this.audioElement.pause();
-                this.audioElement.currentTime = 0;
                 
                 const songs = document.querySelectorAll('.song-item');
                 songs.forEach(s => s.classList.remove('bg-indigo-600'));
@@ -279,13 +290,16 @@
                 musicBtn.classList.remove('bg-indigo-600');
                 musicBtn.classList.add('bg-white/10');
                 musicIcon.classList.remove('animate-pulse');
+                
+                const playerModal = document.getElementById('youtubePlayerModal');
+                const playerContainer = document.getElementById('youtubePlayerContainer');
+                playerModal.classList.add('hidden');
+                playerModal.classList.remove('flex');
+                playerContainer.innerHTML = '';
             },
             
             setMusicVolume(vol) {
                 this.musicVolume = vol;
-                if (this.audioElement) {
-                    this.audioElement.volume = vol;
-                }
             },
             
             setSfxVolume(vol) {
@@ -330,7 +344,8 @@
                 onlinePlayers: "Online",
                 musicTitle: "Music Player",
                 volumeLabel: "Volume",
-                stopMusic: "Stop"
+                stopMusic: "Stop Music",
+                closePlayer: "Close"
             },
             ar: {
                 title: "كارد<span class='text-cyan-300'>إكس</span> الترا",
@@ -364,9 +379,10 @@
                 winner: "الفائز",
                 gameStats: "إحصائيات",
                 onlinePlayers: "متصل",
-                musicTitle: "مشغل الموسيقى",
+                musicTitle: "مشغل الأغاني",
                 volumeLabel: "مستوى الصوت",
-                stopMusic: "إيقاف"
+                stopMusic: "إيقاف",
+                closePlayer: "إغلاق"
             }
         };
 
@@ -483,14 +499,6 @@
             @keyframes pulse-glow {
                 0%, 100% { box-shadow: 0 0 20px rgba(99, 102, 241, 0.5); }
                 50% { box-shadow: 0 0 40px rgba(99, 102, 241, 0.8), 0 0 60px rgba(168, 85, 247, 0.4); }
-            }
-            @keyframes float {
-                0%, 100% { transform: translateY(0); }
-                50% { transform: translateY(-10px); }
-            }
-            @keyframes shimmer {
-                0% { background-position: -200% 0; }
-                100% { background-position: 200% 0; }
             }
             @keyframes cardEntrance {
                 from { opacity: 0; transform: translateY(30px) scale(0.9); }
@@ -866,7 +874,7 @@
             log.innerHTML = messages.map((m, idx) => `
                 <div class="mb-3 p-4 rounded-2xl ${m.isCorrect 
                     ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white w-full text-center font-black animate-bounce shadow-lg shadow-emerald-500/30 border border-emerald-400/30' 
-                    : (m.sender === playerRole ? 'bg-indigo-600/30 ml-auto border border-indigo-400/20' : 'bg-white/5 border border-white/5')} 
+                    : (m.sender === playerRole ? 'bg-indigo-600/30 ml-auto border border-indigo-400/20' : 'bg-white/5 border border-white/5'))} 
                     max-w-[85%] transition-all duration-300" style="animation: cardEntrance 0.3s ease-out ${idx * 0.05}s both">
                     <p class="text-[9px] opacity-70 uppercase font-bold mb-1.5 tracking-wider">${m.senderName || 'Anonymous'}</p>
                     <p class="text-sm font-semibold leading-relaxed">${m.text}</p>
@@ -1256,15 +1264,27 @@
     </style>
 </head>
 <body class="dark-theme min-h-screen flex flex-col items-center">
-    <!-- Hidden Audio Element -->
-    <audio id="backgroundMusic" loop></audio>
-    
     <!-- Particle Canvas -->
     <canvas id="particleCanvas" class="fixed inset-0 pointer-events-none z-0"></canvas>
     
     <!-- Ambient Glow -->
     <div class="fixed top-0 left-1/4 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl pointer-events-none"></div>
     <div class="fixed bottom-0 right-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-3xl pointer-events-none"></div>
+
+    <!-- YouTube Player Modal -->
+    <div id="youtubePlayerModal" class="hidden fixed inset-0 z-[200] modal-overlay items-center justify-center p-4">
+        <div class="glass-panel p-6 max-w-lg w-full rounded-3xl glow-border">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold text-white">Now Playing</h3>
+                <button onclick="stopMusic()" class="p-2 rounded-lg bg-rose-600/20 text-rose-400 hover:bg-rose-600 hover:text-white transition-all">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div id="youtubePlayerContainer"></div>
+        </div>
+    </div>
 
     <!-- Vote Modal -->
     <div id="voteModal" class="hidden fixed inset-0 z-[100] modal-overlay items-center justify-center p-4">
@@ -1331,68 +1351,117 @@
                     </button>
                     
                     <!-- Music Panel -->
-                    <div id="musicPanel" class="hidden absolute top-full right-0 mt-2 p-4 rounded-xl volume-slider border border-white/10 w-72 z-50">
+                    <div id="musicPanel" class="hidden absolute top-full right-0 mt-2 p-4 rounded-xl volume-slider border border-white/10 w-80 z-50">
                         <h3 class="text-sm font-bold text-white mb-3 flex items-center gap-2">
                             <span>🎵</span>
                             <span data-t="musicTitle">Music Player</span>
                         </h3>
                         
                         <!-- Songs List -->
-                        <div class="space-y-1 mb-4 max-h-48 overflow-y-auto custom-scroll">
-                            <div class="song-item p-2 rounded-lg cursor-pointer flex items-center gap-2 bg-white/5" onclick="playSong(0)">
-                                <span class="text-lg">🎸</span>
+                        <div class="space-y-1 mb-4 max-h-64 overflow-y-auto custom-scroll pr-1">
+                            <div class="song-item p-2 rounded-lg cursor-pointer flex items-center gap-3 bg-white/5" onclick="playSong(0)">
+                                <span class="text-xl">👑</span>
                                 <div>
-                                    <p class="text-xs font-bold text-white">Electronic Vibes</p>
-                                    <p class="text-[10px] text-white/50">Upbeat Energy</p>
+                                    <p class="text-xs font-bold text-white">Queen - Bohemian Rhapsody</p>
+                                    <p class="text-[10px] text-white/50">English Rock</p>
                                 </div>
                             </div>
-                            <div class="song-item p-2 rounded-lg cursor-pointer flex items-center gap-2 bg-white/5" onclick="playSong(1)">
-                                <span class="text-lg">🎹</span>
+                            <div class="song-item p-2 rounded-lg cursor-pointer flex items-center gap-3 bg-white/5" onclick="playSong(1)">
+                                <span class="text-xl">🔥</span>
                                 <div>
-                                    <p class="text-xs font-bold text-white">Chill Melody</p>
-                                    <p class="text-[10px] text-white/50">Relaxing Tunes</p>
+                                    <p class="text-xs font-bold text-white">Luis Fonsi - Despacito</p>
+                                    <p class="text-[10px] text-white/50">Latin Pop</p>
                                 </div>
                             </div>
-                            <div class="song-item p-2 rounded-lg cursor-pointer flex items-center gap-2 bg-white/5" onclick="playSong(2)">
-                                <span class="text-lg">🎷</span>
+                            <div class="song-item p-2 rounded-lg cursor-pointer flex items-center gap-3 bg-white/5" onclick="playSong(2)">
+                                <span class="text-xl">❤️</span>
                                 <div>
-                                    <p class="text-xs font-bold text-white">Jazz Nights</p>
-                                    <p class="text-[10px] text-white/50">Smooth Sounds</p>
+                                    <p class="text-xs font-bold text-white">Ed Sheeran - Shape of You</p>
+                                    <p class="text-[10px] text-white/50">English Pop</p>
                                 </div>
                             </div>
-                            <div class="song-item p-2 rounded-lg cursor-pointer flex items-center gap-2 bg-white/5" onclick="playSong(3)">
-                                <span class="text-lg">🎻</span>
+                            <div class="song-item p-2 rounded-lg cursor-pointer flex items-center gap-3 bg-white/5" onclick="playSong(3)">
+                                <span class="text-xl">💫</span>
                                 <div>
-                                    <p class="text-xs font-bold text-white">Classical Mix</p>
-                                    <p class="text-[10px] text-white/50">Orchestral</p>
+                                    <p class="text-xs font-bold text-white">Wiz Khalifa - See You Again</p>
+                                    <p class="text-[10px] text-white/50">Hip Hop</p>
                                 </div>
                             </div>
-                            <div class="song-item p-2 rounded-lg cursor-pointer flex items-center gap-2 bg-white/5" onclick="playSong(4)">
-                                <span class="text-lg">🥁</span>
+                            <div class="song-item p-2 rounded-lg cursor-pointer flex items-center gap-3 bg-white/5" onclick="playSong(4)">
+                                <span class="text-xl">🇰🇷</span>
                                 <div>
-                                    <p class="text-xs font-bold text-white">Rock Beats</p>
-                                    <p class="text-[10px] text-white/50">High Energy</p>
+                                    <p class="text-xs font-bold text-white">PSY - Gangnam Style</p>
+                                    <p class="text-[10px] text-white/50">K-Pop</p>
                                 </div>
                             </div>
-                            <div class="song-item p-2 rounded-lg cursor-pointer flex items-center gap-2 bg-white/5" onclick="playSong(5)">
-                                <span class="text-lg">🎺</span>
+                            <div class="song-item p-2 rounded-lg cursor-pointer flex items-center gap-3 bg-white/5" onclick="playSong(5)">
+                                <span class="text-xl">⭐</span>
                                 <div>
-                                    <p class="text-xs font-bold text-white">Funk Groove</p>
-                                    <p class="text-[10px] text-white/50">Dance Vibes</p>
+                                    <p class="text-xs font-bold text-white">OneRepublic - Counting Stars</p>
+                                    <p class="text-[10px] text-white/50">Pop Rock</p>
                                 </div>
                             </div>
-                            <div class="song-item p-2 rounded-lg cursor-pointer flex items-center gap-2 bg-white/5" onclick="playSong(6)">
-                                <span class="text-lg">🌙</span>
+                            <div class="song-item p-2 rounded-lg cursor-pointer flex items-center gap-3 bg-white/5" onclick="playSong(6)">
+                                <span class="text-xl">🦁</span>
                                 <div>
-                                    <p class="text-xs font-bold text-white">Night Owl</p>
-                                    <p class="text-[10px] text-white/50">Ambient</p>
+                                    <p class="text-xs font-bold text-white">Katy Perry - Roar</p>
+                                    <p class="text-[10px] text-white/50">Pop</p>
                                 </div>
                             </div>
-                            <div class="song-item p-2 rounded-lg cursor-pointer flex items-center gap-2 bg-white/5" onclick="playSong(7)">
-                                <span class="text-lg">⚡</span>
+                            <div class="song-item p-2 rounded-lg cursor-pointer flex items-center gap-3 bg-white/5" onclick="playSong(7)">
+                                <span class="text-xl">🕺</span>
                                 <div>
-                                    <p class="text-xs font-bold text-white">Power Up</p>
-                                    <p class="text-[10px] text-white/50">Epic Theme</p>
+                                    <p class="text-xs font-bold text-white">Bruno Mars - Uptown Funk</p>
+                                    <p class="text-[10px] text-white/50">Funk</p>
+                                </div>
+                            </div>
+                            <div class="song-item p-2 rounded-lg cursor-pointer flex items-center gap-3 bg-white/5" onclick="playSong(8)">
+                                <span class="text-xl">👋</span>
+                                <div>
+                                    <p class="text-xs font-bold text-white">Adele - Hello</p>
+                                    <p class="text-[10px] text-white/50">Soul Pop</p>
+                                </div>
+                            </div>
+                            <div class="song-item p-2 rounded-lg cursor-pointer flex items-center gap-3 bg-white/5" onclick="playSong(9)">
+                                <span class="text-xl">💔</span>
+                                <div>
+                                    <p class="text-xs font-bold text-white">Adele - Someone Like You</p>
+                                    <p class="text-[10px] text-white/50">Soul</p>
+                                </div>
+                            </div>
+                            <div class="song-item p-2 rounded-lg cursor-pointer flex items-center gap-3 bg-white/5" onclick="playSong(10)">
+                                <span class="text-xl">🍬</span>
+                                <div>
+                                    <p class="text-xs font-bold text-white">Maroon 5 - Sugar</p>
+                                    <p class="text-[10px] text-white/50">Pop</p>
+                                </div>
+                            </div>
+                            <div class="song-item p-2 rounded-lg cursor-pointer flex items-center gap-3 bg-white/5" onclick="playSong(11)">
+                                <span class="text-xl">⚽</span>
+                                <div>
+                                    <p class="text-xs font-bold text-white">Shakira - Waka Waka</p>
+                                    <p class="text-[10px] text-white/50">Latin Pop</p>
+                                </div>
+                            </div>
+                            <div class="song-item p-2 rounded-lg cursor-pointer flex items-center gap-3 bg-white/5" onclick="playSong(12)">
+                                <span class="text-xl">😈</span>
+                                <div>
+                                    <p class="text-xs font-bold text-white">Imagine Dragons - Demons</p>
+                                    <p class="text-[10px] text-white/50">Alternative Rock</p>
+                                </div>
+                            </div>
+                            <div class="song-item p-2 rounded-lg cursor-pointer flex items-center gap-3 bg-white/5" onclick="playSong(13)">
+                                <span class="text-xl">💎</span>
+                                <div>
+                                    <p class="text-xs font-bold text-white">Rihanna - Diamonds</p>
+                                    <p class="text-[10px] text-white/50">R&B Pop</p>
+                                </div>
+                            </div>
+                            <div class="song-item p-2 rounded-lg cursor-pointer flex items-center gap-3 bg-white/5" onclick="playSong(14)">
+                                <span class="text-xl">🚀</span>
+                                <div>
+                                    <p class="text-xs font-bold text-white">Dua Lipa - Levitating</p>
+                                    <p class="text-[10px] text-white/50">Disco Pop</p>
                                 </div>
                             </div>
                         </div>
@@ -1400,11 +1469,7 @@
                         <!-- Volume Controls -->
                         <div class="space-y-3 pt-3 border-t border-white/10">
                             <div>
-                                <label class="text-[10px] font-bold text-white/60 uppercase tracking-wider block mb-2">Music Volume</label>
-                                <input type="range" min="0" max="100" value="50" oninput="setVolume('music', this.value)" class="w-full">
-                            </div>
-                            <div>
-                                <label class="text-[10px] font-bold text-white/60 uppercase tracking-wider block mb-2">Sound Effects</label>
+                                <label class="text-[10px] font-bold text-white/60 uppercase tracking-wider block mb-2">Sound Effects Volume</label>
                                 <input type="range" min="0" max="100" value="60" oninput="setVolume('sfx', this.value)" class="w-full">
                             </div>
                         </div>
