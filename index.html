@@ -33,6 +33,158 @@
         let gameStats = { rounds: 0, correctGuesses: 0 };
         const roomId = "global_stable_v4_pro"; 
 
+        // ========== SOUND SYSTEM ==========
+        const SoundSystem = {
+            ctx: null,
+            musicEnabled: false,
+            musicVolume: 0.3,
+            sfxVolume: 0.5,
+            musicOscillators: [],
+            musicGains: [],
+            
+            init() {
+                this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+            },
+            
+            ensureContext() {
+                if (!this.ctx) this.init();
+                if (this.ctx.state === 'suspended') this.ctx.resume();
+            },
+            
+            // Card flip sound
+            playCardFlip() {
+                this.ensureContext();
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(800, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(400, this.ctx.currentTime + 0.15);
+                
+                gain.gain.setValueAtTime(this.sfxVolume * 0.3, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.15);
+                
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.15);
+            },
+            
+            // Victory sound
+            playVictory() {
+                this.ensureContext();
+                const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+                
+                notes.forEach((freq, i) => {
+                    setTimeout(() => {
+                        const osc = this.ctx.createOscillator();
+                        const gain = this.ctx.createGain();
+                        osc.connect(gain);
+                        gain.connect(this.ctx.destination);
+                        
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                        
+                        gain.gain.setValueAtTime(this.sfxVolume * 0.4, this.ctx.currentTime);
+                        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.4);
+                        
+                        osc.start();
+                        osc.stop(this.ctx.currentTime + 0.4);
+                    }, i * 100);
+                });
+            },
+            
+            // Click sound
+            playClick() {
+                this.ensureContext();
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(600, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(300, this.ctx.currentTime + 0.05);
+                
+                gain.gain.setValueAtTime(this.sfxVolume * 0.2, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.05);
+                
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.05);
+            },
+            
+            // Success sound
+            playSuccess() {
+                this.ensureContext();
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(880, this.ctx.currentTime);
+                osc.frequency.setValueAtTime(1100, this.ctx.currentTime + 0.1);
+                
+                gain.gain.setValueAtTime(this.sfxVolume * 0.25, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.2);
+                
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.2);
+            },
+            
+            // Background music
+            startMusic() {
+                this.ensureContext();
+                if (this.musicEnabled) return;
+                this.musicEnabled = true;
+                this.playMusicLoop();
+            },
+            
+            playMusicLoop() {
+                if (!this.musicEnabled) return;
+                
+                const notes = [261.63, 293.66, 329.63, 349.23, 392.00, 349.23, 329.63, 293.66];
+                const duration = 0.5;
+                
+                notes.forEach((freq, i) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime + i * duration);
+                    
+                    gain.gain.setValueAtTime(0, this.ctx.currentTime + i * duration);
+                    gain.gain.linearRampToValueAtTime(this.musicVolume * 0.15, this.ctx.currentTime + i * duration + 0.05);
+                    gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + (i + 1) * duration);
+                    
+                    osc.start(this.ctx.currentTime + i * duration);
+                    osc.stop(this.ctx.currentTime + (i + 1) * duration);
+                });
+                
+                setTimeout(() => {
+                    if (this.musicEnabled) this.playMusicLoop();
+                }, notes.length * duration * 1000);
+            },
+            
+            stopMusic() {
+                this.musicEnabled = false;
+            },
+            
+            setMusicVolume(vol) {
+                this.musicVolume = vol;
+            },
+            
+            setSfxVolume(vol) {
+                this.sfxVolume = vol;
+            }
+        };
+
+        // Make SoundSystem globally available
+        window.SoundSystem = SoundSystem;
+
         const translations = {
             en: {
                 title: "CARD<span class='text-cyan-300'>X</span> ULTRA",
@@ -148,7 +300,6 @@
                     p.x += p.speedX;
                     p.y += p.speedY;
 
-                    // Mouse interaction
                     const dx = this.mouseX - p.x;
                     const dy = this.mouseY - p.y;
                     const dist = Math.sqrt(dx * dx + dy * dy);
@@ -157,19 +308,16 @@
                         p.y -= dy * 0.01;
                     }
 
-                    // Wrap around
                     if (p.x < 0) p.x = this.canvas.width;
                     if (p.x > this.canvas.width) p.x = 0;
                     if (p.y < 0) p.y = this.canvas.height;
                     if (p.y > this.canvas.height) p.y = 0;
 
-                    // Draw particle
                     this.ctx.beginPath();
                     this.ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
                     this.ctx.fillStyle = `hsla(${p.hue}, 80%, 60%, ${p.opacity})`;
                     this.ctx.fill();
 
-                    // Connect nearby particles
                     this.particles.slice(index + 1).forEach(p2 => {
                         const d = Math.sqrt((p.x - p2.x) ** 2 + (p.y - p2.y) ** 2);
                         if (d < 100) {
@@ -188,6 +336,7 @@
 
         // Confetti System
         function createConfetti() {
+            SoundSystem.playVictory();
             const colors = ['#6366f1', '#a855f7', '#ec4899', '#10b981', '#f59e0b', '#3b82f6'];
             for (let i = 0; i < 150; i++) {
                 const confetti = document.createElement('div');
@@ -209,7 +358,6 @@
             }
         }
 
-        // Add confetti animation
         const style = document.createElement('style');
         style.textContent = `
             @keyframes confettiFall {
@@ -236,11 +384,13 @@
         document.head.appendChild(style);
 
         window.toggleLanguage = () => {
+            SoundSystem.playClick();
             currentLang = currentLang === 'ar' ? 'en' : 'ar';
             applyTranslations();
         };
 
         window.toggleTheme = () => {
+            SoundSystem.playClick();
             const body = document.body;
             const isDark = body.classList.contains('dark-theme');
             if (isDark) {
@@ -370,6 +520,7 @@
         }
 
         window.updateStoredName = async () => {
+            SoundSystem.playClick();
             const name = document.getElementById('userNameInput').value.trim();
             if (!name) return;
             localStorage.setItem('cardx_username', name);
@@ -380,6 +531,7 @@
             const originalText = saveBtn.innerText;
             saveBtn.innerText = currentLang === 'ar' ? "تم الحفظ" : "SAVED";
             saveBtn.classList.add('bg-emerald-600');
+            SoundSystem.playSuccess();
             setTimeout(() => {
                 saveBtn.innerText = originalText;
                 saveBtn.classList.remove('bg-emerald-600');
@@ -388,6 +540,7 @@
 
         window.setupPlayer = async (role) => {
             if (!currentUser) return;
+            SoundSystem.playSuccess();
             const savedName = localStorage.getItem('cardx_username');
             const userName = document.getElementById('userNameInput').value.trim() || savedName || `Player ${role}`;
             playerRole = role;
@@ -405,6 +558,7 @@
         };
 
         window.exitToLobby = async () => {
+            SoundSystem.playClick();
             if (playerRole && playerRole !== 'viewer') {
                 await updateDoc(doc(db, 'games', roomId), { 
                     [`p${playerRole}Id`]: "", 
@@ -432,8 +586,7 @@
                     const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
                     lastLoadedImage = dataUrl;
                     await updateDoc(doc(db, 'games', roomId), { [`p${playerRole}`]: dataUrl });
-                    
-                    // Visual feedback
+                    SoundSystem.playSuccess();
                     const btn = document.querySelector('[onclick^="document.getElementById(\'file\')"]');
                     if (btn) {
                         btn.classList.add('ring-2', 'ring-emerald-400');
@@ -451,14 +604,14 @@
             lastLoadedImage = null;
             await updateDoc(doc(db, 'games', roomId), { [`p${playerRole}`]: val });
             document.getElementById('cardInput').value = "";
-            
-            // Visual feedback
+            SoundSystem.playSuccess();
             const saveBtn = document.querySelector('[onclick="saveTextCard()"]');
             saveBtn.classList.add('bg-emerald-600');
             setTimeout(() => saveBtn.classList.remove('bg-emerald-600'), 1000);
         };
 
         window.toggleEmojiPicker = () => {
+            SoundSystem.playClick();
             const picker = document.getElementById('emojiPicker');
             picker.classList.toggle('hidden');
             picker.classList.toggle('scale-95');
@@ -466,6 +619,7 @@
         };
 
         window.addEmoji = (emoji) => {
+            SoundSystem.playClick();
             const input = document.getElementById('clueInput');
             input.value += emoji;
             input.focus();
@@ -473,12 +627,14 @@
         };
 
         window.toggleMyReveal = async () => {
+            SoundSystem.playCardFlip();
             const snap = await getDoc(doc(db, 'games', roomId));
             const current = snap.data()[`p${playerRole}Reveal`] || false;
             await updateDoc(doc(db, 'games', roomId), { [`p${playerRole}Reveal`]: !current });
         };
 
         window.handleCardClick = async () => {
+            SoundSystem.playCardFlip();
             isLocalPreviewOpen = !isLocalPreviewOpen;
             const snap = await getDoc(doc(db, 'games', roomId));
             updateGameArena(snap.data());
@@ -517,9 +673,13 @@
                 
                 const flipCard = document.getElementById('myFlipCard');
                 if (data.open || isRevealedToPublic || isLocalPreviewOpen) {
-                    flipCard.classList.add('is-flipped');
+                    if (!flipCard.classList.contains('is-flipped')) {
+                        flipCard.classList.add('is-flipped');
+                    }
                 } else {
-                    flipCard.classList.remove('is-flipped');
+                    if (flipCard.classList.contains('is-flipped')) {
+                        flipCard.classList.remove('is-flipped');
+                    }
                 }
             }
 
@@ -536,6 +696,11 @@
                 const pName = data[`p${i}Name`] || `Player ${i}`;
                 const pPoints = data[`p${i}Points`] || 0;
                 
+                // Play sound when opponent card reveals
+                if (reveal && !data.previousReveal) {
+                    SoundSystem.playCardFlip();
+                }
+                
                 grid.innerHTML += `
                     <div class="relative group" style="animation: cardEntrance 0.4s ease-out ${opponentCount * 0.1}s both">
                         <div class="absolute -inset-0.5 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-3xl blur opacity-30 group-hover:opacity-50 transition-opacity"></div>
@@ -551,7 +716,7 @@
                             </div>
                             
                             <div class="perspective w-full aspect-[3/4] max-w-[180px] mx-auto">
-                                <div class="card-inner ${reveal ? 'is-flipped' : ''}">
+                                <div class="card-inner ${reveal ? 'is-flipped' : ''}" data-revealed="${reveal}">
                                     <div class="card-face card-front shadow-2xl">
                                         <div class="absolute inset-0 bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 rounded-2xl"></div>
                                         <div class="relative flex flex-col items-center justify-center h-full">
@@ -600,6 +765,7 @@
         }
 
         window.sendClue = async () => {
+            SoundSystem.playClick();
             const input = document.getElementById('clueInput');
             const text = input.value.trim();
             if (!text || playerRole === 'viewer') return;
@@ -611,7 +777,6 @@
                 if (i === playerRole) continue;
                 if (data[`p${i}`] && !data[`p${i}`].startsWith('data:image') && text.toLowerCase() === data[`p${i}`].toLowerCase()) {
                     isCorrect = true;
-                    // Award point to current player
                     const currentPoints = data[`p${playerRole}Points`] || 0;
                     await updateDoc(doc(db, 'games', roomId), {
                         [`p${playerRole}Points`]: currentPoints + 1
@@ -634,6 +799,7 @@
         };
 
         window.revealGame = async () => {
+            SoundSystem.playClick();
             const snap = await getDoc(doc(db, 'games', roomId));
             const data = snap.data();
             if (data.votingActive) return;
@@ -644,6 +810,7 @@
         };
 
         window.castVote = async (approved) => {
+            SoundSystem.playClick();
             const snap = await getDoc(doc(db, 'games', roomId));
             const data = snap.data();
             if (!approved) {
@@ -678,7 +845,6 @@
                 for(let i=1; i<=4; i++) if(data[`p${i}Id`]) activeCount++;
                 document.getElementById('voteProgressText').innerText = `${(data.votes || []).length} / ${activeCount}`;
                 
-                // Check if current user has voted
                 const hasVoted = (data.votes || []).includes(currentUser?.uid);
                 document.getElementById('approveVoteBtn').disabled = hasVoted;
                 document.getElementById('approveVoteBtn').classList.toggle('opacity-50', hasVoted);
@@ -689,6 +855,7 @@
         }
 
         window.resetArena = async () => {
+            SoundSystem.playSuccess();
             const roomRef = doc(db, 'games', roomId);
             const snap = await getDoc(roomRef);
             const data = snap.data();
@@ -706,6 +873,7 @@
         };
 
         window.fullReset = async () => {
+            SoundSystem.playClick();
             if (confirm(currentLang === 'ar' ? 'هل أنت متأكد من إعادة تعيين كل شيء؟' : 'Reset all data?')) {
                 await setDoc(doc(db, 'games', roomId), { 
                     p1:"", p2:"", p3:"", p4:"", 
@@ -735,7 +903,40 @@
             }
         }
 
-        // Initialize
+        // Music toggle function
+        window.toggleMusic = () => {
+            SoundSystem.playClick();
+            const musicBtn = document.getElementById('musicBtn');
+            const musicIcon = document.getElementById('musicIcon');
+            
+            if (SoundSystem.musicEnabled) {
+                SoundSystem.stopMusic();
+                musicBtn.classList.remove('bg-indigo-600');
+                musicBtn.classList.add('bg-white/10');
+                musicIcon.classList.remove('animate-pulse');
+            } else {
+                SoundSystem.startMusic();
+                musicBtn.classList.add('bg-indigo-600');
+                musicBtn.classList.remove('bg-white/10');
+                musicIcon.classList.add('animate-pulse');
+            }
+        };
+
+        // Volume controls
+        window.showVolumeSlider = () => {
+            const slider = document.getElementById('volumeSlider');
+            slider.classList.toggle('hidden');
+        };
+
+        window.setVolume = (type, value) => {
+            SoundSystem.playClick();
+            if (type === 'music') {
+                SoundSystem.setMusicVolume(value / 100);
+            } else {
+                SoundSystem.setSfxVolume(value / 100);
+            }
+        };
+
         onAuthStateChanged(auth, async (user) => {
             if (user) { 
                 currentUser = user; 
@@ -751,7 +952,6 @@
             const savedTheme = localStorage.getItem('cardx_theme') || 'dark';
             document.body.className = savedTheme + '-theme min-h-screen flex flex-col items-center';
             
-            // Initialize particles
             const canvas = document.getElementById('particleCanvas');
             if (canvas) new ParticleSystem(canvas);
             
@@ -830,6 +1030,7 @@
         .is-flipped { transform: rotateY(180deg); }
         .card-face { 
             backface-visibility: hidden; 
+            -webkit-backface-visibility: hidden;
             position: absolute; 
             width: 100%; 
             height: 100%; 
@@ -904,6 +1105,33 @@
             border-color: rgba(0, 0, 0, 0.1);
         }
 
+        .volume-slider {
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(20px);
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            height: 6px;
+            border-radius: 3px;
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #6366f1;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+            background: #a855f7;
+        }
+
         @media (max-width: 768px) {
             .logo-text { font-size: 1.5rem; }
         }
@@ -972,6 +1200,25 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
                         </svg>
                         <span id="roundsCount" class="text-sm font-bold text-white">0</span>
+                    </div>
+                </div>
+
+                <!-- Music Button -->
+                <div class="relative">
+                    <button id="musicBtn" onclick="toggleMusic()" class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center transition-all hover:bg-white/20">
+                        <span id="musicIcon" class="text-lg">🎵</span>
+                    </button>
+                    
+                    <!-- Volume Slider Dropdown -->
+                    <div id="volumeSlider" class="hidden absolute top-full right-0 mt-2 p-4 rounded-xl volume-slider border border-white/10 min-w-[180px] z-50">
+                        <div class="mb-3">
+                            <label class="text-[10px] font-bold text-white/60 uppercase tracking-wider block mb-2">Music</label>
+                            <input type="range" min="0" max="100" value="30" oninput="setVolume('music', this.value)" class="w-full">
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-bold text-white/60 uppercase tracking-wider block mb-2">Sound FX</label>
+                            <input type="range" min="0" max="100" value="50" oninput="setVolume('sfx', this.value)" class="w-full">
+                        </div>
                     </div>
                 </div>
                 
