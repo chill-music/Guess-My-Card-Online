@@ -33,17 +33,18 @@
         let gameStats = { rounds: 0, correctGuesses: 0 };
         const roomId = "global_stable_v4_pro"; 
 
-        // ========== SOUND SYSTEM ==========
+        // ========== PROFESSIONAL SOUND SYSTEM ==========
         const SoundSystem = {
             ctx: null,
             musicEnabled: false,
-            musicVolume: 0.3,
-            sfxVolume: 0.5,
-            musicOscillators: [],
-            musicGains: [],
+            musicVolume: 0.5,
+            sfxVolume: 0.6,
+            currentSong: null,
+            audioElement: null,
             
             init() {
                 this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                this.audioElement = document.getElementById('backgroundMusic');
             },
             
             ensureContext() {
@@ -51,130 +52,240 @@
                 if (this.ctx.state === 'suspended') this.ctx.resume();
             },
             
-            // Card flip sound
+            // Professional card flip sound
             playCardFlip() {
                 this.ensureContext();
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
-                osc.connect(gain);
-                gain.connect(this.ctx.destination);
                 
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(800, this.ctx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(400, this.ctx.currentTime + 0.15);
+                // Main flip whoosh
+                const osc1 = this.ctx.createOscillator();
+                const osc2 = this.ctx.createOscillator();
+                const gain1 = this.ctx.createGain();
+                const gain2 = this.ctx.createGain();
+                const filter = this.ctx.createBiquadFilter();
                 
-                gain.gain.setValueAtTime(this.sfxVolume * 0.3, this.ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.15);
+                // White noise for whoosh
+                const bufferSize = this.ctx.sampleRate * 0.15;
+                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.3));
+                }
+                const noise = this.ctx.createBufferSource();
+                noise.buffer = buffer;
                 
-                osc.start();
-                osc.stop(this.ctx.currentTime + 0.15);
+                const noiseGain = this.ctx.createGain();
+                const noiseFilter = this.ctx.createBiquadFilter();
+                noiseFilter.type = 'bandpass';
+                noiseFilter.frequency.value = 2000;
+                noiseFilter.Q.value = 0.5;
+                
+                noise.connect(noiseFilter);
+                noiseFilter.connect(noiseGain);
+                noiseGain.connect(this.ctx.destination);
+                
+                noiseGain.gain.setValueAtTime(this.sfxVolume * 0.15, this.ctx.currentTime);
+                noiseGain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.15);
+                
+                // Tones
+                osc1.type = 'sine';
+                osc1.frequency.setValueAtTime(1200, this.ctx.currentTime);
+                osc1.frequency.exponentialRampToValueAtTime(600, this.ctx.currentTime + 0.1);
+                
+                osc2.type = 'sine';
+                osc2.frequency.setValueAtTime(800, this.ctx.currentTime);
+                osc2.frequency.exponentialRampToValueAtTime(400, this.ctx.currentTime + 0.1);
+                
+                osc1.connect(gain1);
+                osc2.connect(gain2);
+                gain1.connect(this.ctx.destination);
+                gain2.connect(this.ctx.destination);
+                
+                gain1.gain.setValueAtTime(this.sfxVolume * 0.2, this.ctx.currentTime);
+                gain1.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.12);
+                
+                gain2.gain.setValueAtTime(this.sfxVolume * 0.15, this.ctx.currentTime);
+                gain2.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.12);
+                
+                osc1.start();
+                osc2.start();
+                noise.start();
+                osc1.stop(this.ctx.currentTime + 0.15);
+                osc2.stop(this.ctx.currentTime + 0.15);
+                noise.stop(this.ctx.currentTime + 0.15);
             },
             
-            // Victory sound
+            // Professional victory fanfare
             playVictory() {
                 this.ensureContext();
-                const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
                 
-                notes.forEach((freq, i) => {
-                    setTimeout(() => {
-                        const osc = this.ctx.createOscillator();
-                        const gain = this.ctx.createGain();
-                        osc.connect(gain);
-                        gain.connect(this.ctx.destination);
-                        
-                        osc.type = 'sine';
-                        osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
-                        
-                        gain.gain.setValueAtTime(this.sfxVolume * 0.4, this.ctx.currentTime);
-                        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.4);
-                        
-                        osc.start();
-                        osc.stop(this.ctx.currentTime + 0.4);
-                    }, i * 100);
-                });
-            },
-            
-            // Click sound
-            playClick() {
-                this.ensureContext();
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
-                osc.connect(gain);
-                gain.connect(this.ctx.destination);
-                
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(600, this.ctx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(300, this.ctx.currentTime + 0.05);
-                
-                gain.gain.setValueAtTime(this.sfxVolume * 0.2, this.ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.05);
-                
-                osc.start();
-                osc.stop(this.ctx.currentTime + 0.05);
-            },
-            
-            // Success sound
-            playSuccess() {
-                this.ensureContext();
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
-                osc.connect(gain);
-                gain.connect(this.ctx.destination);
-                
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(880, this.ctx.currentTime);
-                osc.frequency.setValueAtTime(1100, this.ctx.currentTime + 0.1);
-                
-                gain.gain.setValueAtTime(this.sfxVolume * 0.25, this.ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.2);
-                
-                osc.start();
-                osc.stop(this.ctx.currentTime + 0.2);
-            },
-            
-            // Background music
-            startMusic() {
-                this.ensureContext();
-                if (this.musicEnabled) return;
-                this.musicEnabled = true;
-                this.playMusicLoop();
-            },
-            
-            playMusicLoop() {
-                if (!this.musicEnabled) return;
-                
-                const notes = [261.63, 293.66, 329.63, 349.23, 392.00, 349.23, 329.63, 293.66];
-                const duration = 0.5;
-                
-                notes.forEach((freq, i) => {
+                const playNote = (freq, startTime, duration, type = 'sine') => {
                     const osc = this.ctx.createOscillator();
                     const gain = this.ctx.createGain();
+                    
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime + startTime);
+                    
+                    // Add vibrato
+                    const vibrato = this.ctx.createOscillator();
+                    const vibratoGain = this.ctx.createGain();
+                    vibrato.frequency.value = 5;
+                    vibratoGain.gain.value = 3;
+                    vibrato.connect(vibratoGain);
+                    vibratoGain.connect(osc.frequency);
+                    vibrato.start(this.ctx.currentTime + startTime);
+                    vibrato.stop(this.ctx.currentTime + startTime + duration);
                     
                     osc.connect(gain);
                     gain.connect(this.ctx.destination);
                     
-                    osc.type = 'sine';
-                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime + i * duration);
+                    gain.gain.setValueAtTime(0, this.ctx.currentTime + startTime);
+                    gain.gain.linearRampToValueAtTime(this.sfxVolume * 0.3, this.ctx.currentTime + startTime + 0.02);
+                    gain.gain.setValueAtTime(this.sfxVolume * 0.3, this.ctx.currentTime + startTime + duration * 0.7);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + startTime + duration);
                     
-                    gain.gain.setValueAtTime(0, this.ctx.currentTime + i * duration);
-                    gain.gain.linearRampToValueAtTime(this.musicVolume * 0.15, this.ctx.currentTime + i * duration + 0.05);
-                    gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + (i + 1) * duration);
-                    
-                    osc.start(this.ctx.currentTime + i * duration);
-                    osc.stop(this.ctx.currentTime + (i + 1) * duration);
+                    osc.start(this.ctx.currentTime + startTime);
+                    osc.stop(this.ctx.currentTime + startTime + duration);
+                };
+                
+                // Victory melody - ascending major chord arpeggio
+                const notes = [
+                    { freq: 523.25, time: 0, dur: 0.15 },      // C5
+                    { freq: 659.25, time: 0.12, dur: 0.15 },   // E5
+                    { freq: 783.99, time: 0.24, dur: 0.15 },   // G5
+                    { freq: 1046.50, time: 0.36, dur: 0.3 },   // C6
+                    { freq: 783.99, time: 0.5, dur: 0.15 },    // G5
+                    { freq: 1046.50, time: 0.62, dur: 0.4 },   // C6
+                ];
+                
+                notes.forEach(note => {
+                    playNote(note.freq, note.time, note.dur);
+                    playNote(note.freq * 0.5, note.time, note.dur, 'triangle'); // Octave below
                 });
                 
+                // Shimmer effect
                 setTimeout(() => {
-                    if (this.musicEnabled) this.playMusicLoop();
-                }, notes.length * duration * 1000);
+                    for (let i = 0; i < 5; i++) {
+                        setTimeout(() => {
+                            const osc = this.ctx.createOscillator();
+                            const gain = this.ctx.createGain();
+                            osc.type = 'sine';
+                            osc.frequency.value = 2000 + Math.random() * 3000;
+                            osc.connect(gain);
+                            gain.connect(this.ctx.destination);
+                            gain.gain.setValueAtTime(this.sfxVolume * 0.1, this.ctx.currentTime);
+                            gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.1);
+                            osc.start();
+                            osc.stop(this.ctx.currentTime + 0.1);
+                        }, i * 50);
+                    }
+                }, 600);
             },
             
-            stopMusic() {
+            // Professional click sound
+            playClick() {
+                this.ensureContext();
+                
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(1000, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(600, this.ctx.currentTime + 0.03);
+                
+                gain.gain.setValueAtTime(this.sfxVolume * 0.25, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.04);
+                
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.04);
+            },
+            
+            // Professional success sound
+            playSuccess() {
+                this.ensureContext();
+                
+                const frequencies = [880, 1100, 1320];
+                frequencies.forEach((freq, i) => {
+                    setTimeout(() => {
+                        const osc = this.ctx.createOscillator();
+                        const gain = this.ctx.createGain();
+                        
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                        
+                        gain.gain.setValueAtTime(this.sfxVolume * 0.2, this.ctx.currentTime);
+                        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.15);
+                        
+                        osc.connect(gain);
+                        gain.connect(this.ctx.destination);
+                        
+                        osc.start();
+                        osc.stop(this.ctx.currentTime + 0.15);
+                    }, i * 60);
+                });
+            },
+            
+            // Music controls
+            playSong(songIndex) {
+                const songs = document.querySelectorAll('.song-item');
+                songs.forEach(s => s.classList.remove('bg-indigo-600'));
+                
+                if (this.currentSong === songIndex) {
+                    this.stopSong();
+                    return;
+                }
+                
+                this.currentSong = songIndex;
+                const audio = this.audioElement;
+                
+                const songUrls = [
+                    'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+                    'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
+                    'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
+                    'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
+                    'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3',
+                    'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3',
+                    'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3',
+                    'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3'
+                ];
+                
+                audio.src = songUrls[songIndex];
+                audio.volume = this.musicVolume;
+                audio.play();
+                
+                songs[songIndex].classList.add('bg-indigo-600');
+                this.musicEnabled = true;
+                
+                const musicBtn = document.getElementById('musicBtn');
+                const musicIcon = document.getElementById('musicIcon');
+                musicBtn.classList.add('bg-indigo-600');
+                musicBtn.classList.remove('bg-white/10');
+                musicIcon.classList.add('animate-pulse');
+            },
+            
+            stopSong() {
+                this.currentSong = null;
                 this.musicEnabled = false;
+                this.audioElement.pause();
+                this.audioElement.currentTime = 0;
+                
+                const songs = document.querySelectorAll('.song-item');
+                songs.forEach(s => s.classList.remove('bg-indigo-600'));
+                
+                const musicBtn = document.getElementById('musicBtn');
+                const musicIcon = document.getElementById('musicIcon');
+                musicBtn.classList.remove('bg-indigo-600');
+                musicBtn.classList.add('bg-white/10');
+                musicIcon.classList.remove('animate-pulse');
             },
             
             setMusicVolume(vol) {
                 this.musicVolume = vol;
+                if (this.audioElement) {
+                    this.audioElement.volume = vol;
+                }
             },
             
             setSfxVolume(vol) {
@@ -182,7 +293,6 @@
             }
         };
 
-        // Make SoundSystem globally available
         window.SoundSystem = SoundSystem;
 
         const translations = {
@@ -217,7 +327,10 @@
                 correctGuess: "Correct Guess",
                 winner: "Winner",
                 gameStats: "Game Stats",
-                onlinePlayers: "Online"
+                onlinePlayers: "Online",
+                musicTitle: "Music Player",
+                volumeLabel: "Volume",
+                stopMusic: "Stop"
             },
             ar: {
                 title: "كارد<span class='text-cyan-300'>إكس</span> الترا",
@@ -250,7 +363,10 @@
                 correctGuess: "تخمين صحيح",
                 winner: "الفائز",
                 gameStats: "إحصائيات",
-                onlinePlayers: "متصل"
+                onlinePlayers: "متصل",
+                musicTitle: "مشغل الموسيقى",
+                volumeLabel: "مستوى الصوت",
+                stopMusic: "إيقاف"
             }
         };
 
@@ -379,6 +495,13 @@
             @keyframes cardEntrance {
                 from { opacity: 0; transform: translateY(30px) scale(0.9); }
                 to { opacity: 1; transform: translateY(0) scale(1); }
+            }
+            @keyframes cardGlow {
+                0%, 100% { box-shadow: 0 0 20px rgba(99, 102, 241, 0.3); }
+                50% { box-shadow: 0 0 40px rgba(99, 102, 241, 0.5); }
+            }
+            .card-glow-hover:hover {
+                animation: cardGlow 1.5s ease-in-out infinite;
             }
         `;
         document.head.appendChild(style);
@@ -673,13 +796,9 @@
                 
                 const flipCard = document.getElementById('myFlipCard');
                 if (data.open || isRevealedToPublic || isLocalPreviewOpen) {
-                    if (!flipCard.classList.contains('is-flipped')) {
-                        flipCard.classList.add('is-flipped');
-                    }
+                    flipCard.classList.add('is-flipped');
                 } else {
-                    if (flipCard.classList.contains('is-flipped')) {
-                        flipCard.classList.remove('is-flipped');
-                    }
+                    flipCard.classList.remove('is-flipped');
                 }
             }
 
@@ -696,11 +815,6 @@
                 const pName = data[`p${i}Name`] || `Player ${i}`;
                 const pPoints = data[`p${i}Points`] || 0;
                 
-                // Play sound when opponent card reveals
-                if (reveal && !data.previousReveal) {
-                    SoundSystem.playCardFlip();
-                }
-                
                 grid.innerHTML += `
                     <div class="relative group" style="animation: cardEntrance 0.4s ease-out ${opponentCount * 0.1}s both">
                         <div class="absolute -inset-0.5 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-3xl blur opacity-30 group-hover:opacity-50 transition-opacity"></div>
@@ -716,7 +830,7 @@
                             </div>
                             
                             <div class="perspective w-full aspect-[3/4] max-w-[180px] mx-auto">
-                                <div class="card-inner ${reveal ? 'is-flipped' : ''}" data-revealed="${reveal}">
+                                <div class="card-inner card-glow-hover ${reveal ? 'is-flipped' : ''}" data-revealed="${reveal}">
                                     <div class="card-face card-front shadow-2xl">
                                         <div class="absolute inset-0 bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 rounded-2xl"></div>
                                         <div class="relative flex flex-col items-center justify-center h-full">
@@ -906,28 +1020,23 @@
         // Music toggle function
         window.toggleMusic = () => {
             SoundSystem.playClick();
-            const musicBtn = document.getElementById('musicBtn');
-            const musicIcon = document.getElementById('musicIcon');
-            
-            if (SoundSystem.musicEnabled) {
-                SoundSystem.stopMusic();
-                musicBtn.classList.remove('bg-indigo-600');
-                musicBtn.classList.add('bg-white/10');
-                musicIcon.classList.remove('animate-pulse');
-            } else {
-                SoundSystem.startMusic();
-                musicBtn.classList.add('bg-indigo-600');
-                musicBtn.classList.remove('bg-white/10');
-                musicIcon.classList.add('animate-pulse');
-            }
+            const panel = document.getElementById('musicPanel');
+            panel.classList.toggle('hidden');
         };
 
-        // Volume controls
-        window.showVolumeSlider = () => {
-            const slider = document.getElementById('volumeSlider');
-            slider.classList.toggle('hidden');
+        // Play song function
+        window.playSong = (index) => {
+            SoundSystem.playClick();
+            SoundSystem.playSong(index);
         };
 
+        // Stop music function
+        window.stopMusic = () => {
+            SoundSystem.playClick();
+            SoundSystem.stopSong();
+        };
+
+        // Volume control
         window.setVolume = (type, value) => {
             SoundSystem.playClick();
             if (type === 'music') {
@@ -951,6 +1060,8 @@
         window.onload = () => {
             const savedTheme = localStorage.getItem('cardx_theme') || 'dark';
             document.body.className = savedTheme + '-theme min-h-screen flex flex-col items-center';
+            
+            SoundSystem.init();
             
             const canvas = document.getElementById('particleCanvas');
             if (canvas) new ParticleSystem(canvas);
@@ -1106,7 +1217,7 @@
         }
 
         .volume-slider {
-            background: rgba(0, 0, 0, 0.8);
+            background: rgba(0, 0, 0, 0.95);
             backdrop-filter: blur(20px);
         }
 
@@ -1132,12 +1243,22 @@
             background: #a855f7;
         }
 
+        .song-item {
+            transition: all 0.2s ease;
+        }
+        .song-item:hover {
+            background: rgba(99, 102, 241, 0.3) !important;
+        }
+
         @media (max-width: 768px) {
             .logo-text { font-size: 1.5rem; }
         }
     </style>
 </head>
 <body class="dark-theme min-h-screen flex flex-col items-center">
+    <!-- Hidden Audio Element -->
+    <audio id="backgroundMusic" loop></audio>
+    
     <!-- Particle Canvas -->
     <canvas id="particleCanvas" class="fixed inset-0 pointer-events-none z-0"></canvas>
     
@@ -1209,16 +1330,89 @@
                         <span id="musicIcon" class="text-lg">🎵</span>
                     </button>
                     
-                    <!-- Volume Slider Dropdown -->
-                    <div id="volumeSlider" class="hidden absolute top-full right-0 mt-2 p-4 rounded-xl volume-slider border border-white/10 min-w-[180px] z-50">
-                        <div class="mb-3">
-                            <label class="text-[10px] font-bold text-white/60 uppercase tracking-wider block mb-2">Music</label>
-                            <input type="range" min="0" max="100" value="30" oninput="setVolume('music', this.value)" class="w-full">
+                    <!-- Music Panel -->
+                    <div id="musicPanel" class="hidden absolute top-full right-0 mt-2 p-4 rounded-xl volume-slider border border-white/10 w-72 z-50">
+                        <h3 class="text-sm font-bold text-white mb-3 flex items-center gap-2">
+                            <span>🎵</span>
+                            <span data-t="musicTitle">Music Player</span>
+                        </h3>
+                        
+                        <!-- Songs List -->
+                        <div class="space-y-1 mb-4 max-h-48 overflow-y-auto custom-scroll">
+                            <div class="song-item p-2 rounded-lg cursor-pointer flex items-center gap-2 bg-white/5" onclick="playSong(0)">
+                                <span class="text-lg">🎸</span>
+                                <div>
+                                    <p class="text-xs font-bold text-white">Electronic Vibes</p>
+                                    <p class="text-[10px] text-white/50">Upbeat Energy</p>
+                                </div>
+                            </div>
+                            <div class="song-item p-2 rounded-lg cursor-pointer flex items-center gap-2 bg-white/5" onclick="playSong(1)">
+                                <span class="text-lg">🎹</span>
+                                <div>
+                                    <p class="text-xs font-bold text-white">Chill Melody</p>
+                                    <p class="text-[10px] text-white/50">Relaxing Tunes</p>
+                                </div>
+                            </div>
+                            <div class="song-item p-2 rounded-lg cursor-pointer flex items-center gap-2 bg-white/5" onclick="playSong(2)">
+                                <span class="text-lg">🎷</span>
+                                <div>
+                                    <p class="text-xs font-bold text-white">Jazz Nights</p>
+                                    <p class="text-[10px] text-white/50">Smooth Sounds</p>
+                                </div>
+                            </div>
+                            <div class="song-item p-2 rounded-lg cursor-pointer flex items-center gap-2 bg-white/5" onclick="playSong(3)">
+                                <span class="text-lg">🎻</span>
+                                <div>
+                                    <p class="text-xs font-bold text-white">Classical Mix</p>
+                                    <p class="text-[10px] text-white/50">Orchestral</p>
+                                </div>
+                            </div>
+                            <div class="song-item p-2 rounded-lg cursor-pointer flex items-center gap-2 bg-white/5" onclick="playSong(4)">
+                                <span class="text-lg">🥁</span>
+                                <div>
+                                    <p class="text-xs font-bold text-white">Rock Beats</p>
+                                    <p class="text-[10px] text-white/50">High Energy</p>
+                                </div>
+                            </div>
+                            <div class="song-item p-2 rounded-lg cursor-pointer flex items-center gap-2 bg-white/5" onclick="playSong(5)">
+                                <span class="text-lg">🎺</span>
+                                <div>
+                                    <p class="text-xs font-bold text-white">Funk Groove</p>
+                                    <p class="text-[10px] text-white/50">Dance Vibes</p>
+                                </div>
+                            </div>
+                            <div class="song-item p-2 rounded-lg cursor-pointer flex items-center gap-2 bg-white/5" onclick="playSong(6)">
+                                <span class="text-lg">🌙</span>
+                                <div>
+                                    <p class="text-xs font-bold text-white">Night Owl</p>
+                                    <p class="text-[10px] text-white/50">Ambient</p>
+                                </div>
+                            </div>
+                            <div class="song-item p-2 rounded-lg cursor-pointer flex items-center gap-2 bg-white/5" onclick="playSong(7)">
+                                <span class="text-lg">⚡</span>
+                                <div>
+                                    <p class="text-xs font-bold text-white">Power Up</p>
+                                    <p class="text-[10px] text-white/50">Epic Theme</p>
+                                </div>
+                            </div>
                         </div>
-                        <div>
-                            <label class="text-[10px] font-bold text-white/60 uppercase tracking-wider block mb-2">Sound FX</label>
-                            <input type="range" min="0" max="100" value="50" oninput="setVolume('sfx', this.value)" class="w-full">
+                        
+                        <!-- Volume Controls -->
+                        <div class="space-y-3 pt-3 border-t border-white/10">
+                            <div>
+                                <label class="text-[10px] font-bold text-white/60 uppercase tracking-wider block mb-2">Music Volume</label>
+                                <input type="range" min="0" max="100" value="50" oninput="setVolume('music', this.value)" class="w-full">
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold text-white/60 uppercase tracking-wider block mb-2">Sound Effects</label>
+                                <input type="range" min="0" max="100" value="60" oninput="setVolume('sfx', this.value)" class="w-full">
+                            </div>
                         </div>
+                        
+                        <!-- Stop Button -->
+                        <button onclick="stopMusic()" data-t="stopMusic" class="w-full mt-3 p-2 rounded-lg bg-rose-600/20 text-rose-400 text-xs font-bold uppercase tracking-wider hover:bg-rose-600 hover:text-white transition-all">
+                            Stop Music
+                        </button>
                     </div>
                 </div>
                 
@@ -1308,7 +1502,7 @@
                     </div>
                     
                     <div class="perspective w-full aspect-[3/4] max-w-[200px] mx-auto">
-                        <div id="myFlipCard" class="card-inner cursor-pointer hover:scale-105 transition-transform" onclick="handleCardClick()">
+                        <div id="myFlipCard" class="card-inner cursor-pointer card-glow-hover" onclick="handleCardClick()">
                             <div class="card-face card-front">
                                 <div class="flex flex-col items-center">
                                     <div class="w-16 h-16 rounded-2xl bg-white/10 flex items-center justify-center mb-2">
