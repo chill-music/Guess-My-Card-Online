@@ -30,196 +30,184 @@
         let lastLoadedImage = null; 
         let isLocalPreviewOpen = false;
         let connectionStatus = 'connecting';
-        let gameStats = { rounds: 0, correctGuesses: 0 };
         const roomId = "global_stable_v4_pro"; 
 
         // ========== PROFESSIONAL SOUND SYSTEM ==========
         const SoundSystem = {
             ctx: null,
+            initialized: false,
             musicEnabled: false,
             musicVolume: 0.5,
             sfxVolume: 0.6,
-            currentSong: null,
             currentSongIndex: -1,
             
             init() {
-                this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                if (this.initialized) return;
+                try {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                    this.initialized = true;
+                } catch (e) {
+                    console.log('Audio not supported');
+                }
             },
             
             ensureContext() {
-                if (!this.ctx) this.init();
-                if (this.ctx.state === 'suspended') this.ctx.resume();
-            },
-            
-            // Professional card flip sound
-            playCardFlip() {
-                this.ensureContext();
-                
-                const osc1 = this.ctx.createOscillator();
-                const osc2 = this.ctx.createOscillator();
-                const gain1 = this.ctx.createGain();
-                const gain2 = this.ctx.createGain();
-                
-                const bufferSize = this.ctx.sampleRate * 0.15;
-                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-                const data = buffer.getChannelData(0);
-                for (let i = 0; i < bufferSize; i++) {
-                    data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.3));
+                if (!this.initialized) this.init();
+                if (this.ctx && this.ctx.state === 'suspended') {
+                    this.ctx.resume();
                 }
-                const noise = this.ctx.createBufferSource();
-                noise.buffer = buffer;
-                
-                const noiseGain = this.ctx.createGain();
-                const noiseFilter = this.ctx.createBiquadFilter();
-                noiseFilter.type = 'bandpass';
-                noiseFilter.frequency.value = 2000;
-                noiseFilter.Q.value = 0.5;
-                
-                noise.connect(noiseFilter);
-                noiseFilter.connect(noiseGain);
-                noiseGain.connect(this.ctx.destination);
-                
-                noiseGain.gain.setValueAtTime(this.sfxVolume * 0.15, this.ctx.currentTime);
-                noiseGain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.15);
-                
-                osc1.type = 'sine';
-                osc1.frequency.setValueAtTime(1200, this.ctx.currentTime);
-                osc1.frequency.exponentialRampToValueAtTime(600, this.ctx.currentTime + 0.1);
-                
-                osc2.type = 'sine';
-                osc2.frequency.setValueAtTime(800, this.ctx.currentTime);
-                osc2.frequency.exponentialRampToValueAtTime(400, this.ctx.currentTime + 0.1);
-                
-                osc1.connect(gain1);
-                osc2.connect(gain2);
-                gain1.connect(this.ctx.destination);
-                gain2.connect(this.ctx.destination);
-                
-                gain1.gain.setValueAtTime(this.sfxVolume * 0.2, this.ctx.currentTime);
-                gain1.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.12);
-                
-                gain2.gain.setValueAtTime(this.sfxVolume * 0.15, this.ctx.currentTime);
-                gain2.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.12);
-                
-                osc1.start();
-                osc2.start();
-                noise.start();
-                osc1.stop(this.ctx.currentTime + 0.15);
-                osc2.stop(this.ctx.currentTime + 0.15);
-                noise.stop(this.ctx.currentTime + 0.15);
             },
             
-            // Professional victory fanfare
-            playVictory() {
-                this.ensureContext();
+            playCardFlip() {
+                if (!this.initialized) this.init();
+                if (!this.ctx) return;
                 
-                const playNote = (freq, startTime, duration, type = 'sine') => {
-                    const osc = this.ctx.createOscillator();
-                    const gain = this.ctx.createGain();
+                try {
+                    const osc1 = this.ctx.createOscillator();
+                    const osc2 = this.ctx.createOscillator();
+                    const gain1 = this.ctx.createGain();
+                    const gain2 = this.ctx.createGain();
                     
-                    osc.type = type;
-                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime + startTime);
-                    
-                    const vibrato = this.ctx.createOscillator();
-                    const vibratoGain = this.ctx.createGain();
-                    vibrato.frequency.value = 5;
-                    vibratoGain.gain.value = 3;
-                    vibrato.connect(vibratoGain);
-                    vibratoGain.connect(osc.frequency);
-                    vibrato.start(this.ctx.currentTime + startTime);
-                    vibrato.stop(this.ctx.currentTime + startTime + duration);
-                    
-                    osc.connect(gain);
-                    gain.connect(this.ctx.destination);
-                    
-                    gain.gain.setValueAtTime(0, this.ctx.currentTime + startTime);
-                    gain.gain.linearRampToValueAtTime(this.sfxVolume * 0.3, this.ctx.currentTime + startTime + 0.02);
-                    gain.gain.setValueAtTime(this.sfxVolume * 0.3, this.ctx.currentTime + startTime + duration * 0.7);
-                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + startTime + duration);
-                    
-                    osc.start(this.ctx.currentTime + startTime);
-                    osc.stop(this.ctx.currentTime + startTime + duration);
-                };
-                
-                const notes = [
-                    { freq: 523.25, time: 0, dur: 0.15 },
-                    { freq: 659.25, time: 0.12, dur: 0.15 },
-                    { freq: 783.99, time: 0.24, dur: 0.15 },
-                    { freq: 1046.50, time: 0.36, dur: 0.3 },
-                    { freq: 783.99, time: 0.5, dur: 0.15 },
-                    { freq: 1046.50, time: 0.62, dur: 0.4 },
-                ];
-                
-                notes.forEach(note => {
-                    playNote(note.freq, note.time, note.dur);
-                    playNote(note.freq * 0.5, note.time, note.dur, 'triangle');
-                });
-                
-                setTimeout(() => {
-                    for (let i = 0; i < 5; i++) {
-                        setTimeout(() => {
-                            const osc = this.ctx.createOscillator();
-                            const gain = this.ctx.createGain();
-                            osc.type = 'sine';
-                            osc.frequency.value = 2000 + Math.random() * 3000;
-                            osc.connect(gain);
-                            gain.connect(this.ctx.destination);
-                            gain.gain.setValueAtTime(this.sfxVolume * 0.1, this.ctx.currentTime);
-                            gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.1);
-                            osc.start();
-                            osc.stop(this.ctx.currentTime + 0.1);
-                        }, i * 50);
+                    const bufferSize = this.ctx.sampleRate * 0.15;
+                    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                    const data = buffer.getChannelData(0);
+                    for (let i = 0; i < bufferSize; i++) {
+                        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.3));
                     }
-                }, 600);
+                    const noise = this.ctx.createBufferSource();
+                    noise.buffer = buffer;
+                    
+                    const noiseGain = this.ctx.createGain();
+                    const noiseFilter = this.ctx.createBiquadFilter();
+                    noiseFilter.type = 'bandpass';
+                    noiseFilter.frequency.value = 2000;
+                    noiseFilter.Q.value = 0.5;
+                    
+                    noise.connect(noiseFilter);
+                    noiseFilter.connect(noiseGain);
+                    noiseGain.connect(this.ctx.destination);
+                    
+                    noiseGain.gain.setValueAtTime(this.sfxVolume * 0.15, this.ctx.currentTime);
+                    noiseGain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.15);
+                    
+                    osc1.type = 'sine';
+                    osc1.frequency.setValueAtTime(1200, this.ctx.currentTime);
+                    osc1.frequency.exponentialRampToValueAtTime(600, this.ctx.currentTime + 0.1);
+                    
+                    osc2.type = 'sine';
+                    osc2.frequency.setValueAtTime(800, this.ctx.currentTime);
+                    osc2.frequency.exponentialRampToValueAtTime(400, this.ctx.currentTime + 0.1);
+                    
+                    osc1.connect(gain1);
+                    osc2.connect(gain2);
+                    gain1.connect(this.ctx.destination);
+                    gain2.connect(this.ctx.destination);
+                    
+                    gain1.gain.setValueAtTime(this.sfxVolume * 0.2, this.ctx.currentTime);
+                    gain1.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.12);
+                    
+                    gain2.gain.setValueAtTime(this.sfxVolume * 0.15, this.ctx.currentTime);
+                    gain2.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.12);
+                    
+                    osc1.start();
+                    osc2.start();
+                    noise.start();
+                    osc1.stop(this.ctx.currentTime + 0.15);
+                    osc2.stop(this.ctx.currentTime + 0.15);
+                    noise.stop(this.ctx.currentTime + 0.15);
+                } catch (e) {}
             },
             
-            // Professional click sound
-            playClick() {
-                this.ensureContext();
+            playVictory() {
+                if (!this.initialized) this.init();
+                if (!this.ctx) return;
                 
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
-                
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(1000, this.ctx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(600, this.ctx.currentTime + 0.03);
-                
-                gain.gain.setValueAtTime(this.sfxVolume * 0.25, this.ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.04);
-                
-                osc.connect(gain);
-                gain.connect(this.ctx.destination);
-                
-                osc.start();
-                osc.stop(this.ctx.currentTime + 0.04);
-            },
-            
-            // Professional success sound
-            playSuccess() {
-                this.ensureContext();
-                
-                const frequencies = [880, 1100, 1320];
-                frequencies.forEach((freq, i) => {
-                    setTimeout(() => {
+                try {
+                    const playNote = (freq, startTime, duration, type = 'sine') => {
                         const osc = this.ctx.createOscillator();
                         const gain = this.ctx.createGain();
                         
-                        osc.type = 'sine';
-                        osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
-                        
-                        gain.gain.setValueAtTime(this.sfxVolume * 0.2, this.ctx.currentTime);
-                        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.15);
+                        osc.type = type;
+                        osc.frequency.setValueAtTime(freq, this.ctx.currentTime + startTime);
                         
                         osc.connect(gain);
                         gain.connect(this.ctx.destination);
                         
-                        osc.start();
-                        osc.stop(this.ctx.currentTime + 0.15);
-                    }, i * 60);
-                });
+                        gain.gain.setValueAtTime(0, this.ctx.currentTime + startTime);
+                        gain.gain.linearRampToValueAtTime(this.sfxVolume * 0.3, this.ctx.currentTime + startTime + 0.02);
+                        gain.gain.setValueAtTime(this.sfxVolume * 0.3, this.ctx.currentTime + startTime + duration * 0.7);
+                        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + startTime + duration);
+                        
+                        osc.start(this.ctx.currentTime + startTime);
+                        osc.stop(this.ctx.currentTime + startTime + duration);
+                    };
+                    
+                    const notes = [
+                        { freq: 523.25, time: 0, dur: 0.15 },
+                        { freq: 659.25, time: 0.12, dur: 0.15 },
+                        { freq: 783.99, time: 0.24, dur: 0.15 },
+                        { freq: 1046.50, time: 0.36, dur: 0.3 },
+                        { freq: 783.99, time: 0.5, dur: 0.15 },
+                        { freq: 1046.50, time: 0.62, dur: 0.4 },
+                    ];
+                    
+                    notes.forEach(note => {
+                        playNote(note.freq, note.time, note.dur);
+                        playNote(note.freq * 0.5, note.time, note.dur, 'triangle');
+                    });
+                } catch (e) {}
             },
             
-            // Play YouTube song
+            playClick() {
+                if (!this.initialized) this.init();
+                if (!this.ctx) return;
+                
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(1000, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(600, this.ctx.currentTime + 0.03);
+                    
+                    gain.gain.setValueAtTime(this.sfxVolume * 0.25, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.04);
+                    
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.04);
+                } catch (e) {}
+            },
+            
+            playSuccess() {
+                if (!this.initialized) this.init();
+                if (!this.ctx) return;
+                
+                try {
+                    const frequencies = [880, 1100, 1320];
+                    frequencies.forEach((freq, i) => {
+                        setTimeout(() => {
+                            const osc = this.ctx.createOscillator();
+                            const gain = this.ctx.createGain();
+                            
+                            osc.type = 'sine';
+                            osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                            
+                            gain.gain.setValueAtTime(this.sfxVolume * 0.2, this.ctx.currentTime);
+                            gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.15);
+                            
+                            osc.connect(gain);
+                            gain.connect(this.ctx.destination);
+                            
+                            osc.start();
+                            osc.stop(this.ctx.currentTime + 0.15);
+                        }, i * 60);
+                    });
+                } catch (e) {}
+            },
+            
             playSong(index) {
                 const songs = document.querySelectorAll('.song-item');
                 songs.forEach(s => s.classList.remove('bg-indigo-600'));
@@ -232,50 +220,41 @@
                 this.currentSongIndex = index;
                 this.musicEnabled = true;
                 
-                songs[index].classList.add('bg-indigo-600');
+                if (songs[index]) songs[index].classList.add('bg-indigo-600');
                 
                 const musicBtn = document.getElementById('musicBtn');
                 const musicIcon = document.getElementById('musicIcon');
-                musicBtn.classList.add('bg-indigo-600');
-                musicBtn.classList.remove('bg-white/10');
-                musicIcon.classList.add('animate-pulse');
+                if (musicBtn) {
+                    musicBtn.classList.add('bg-indigo-600');
+                    musicBtn.classList.remove('bg-white/10');
+                }
+                if (musicIcon) musicIcon.classList.add('animate-pulse');
                 
-                // Show player modal
                 const playerModal = document.getElementById('youtubePlayerModal');
                 const playerContainer = document.getElementById('youtubePlayerContainer');
-                playerModal.classList.remove('hidden');
-                playerModal.classList.add('flex');
-                
-                // YouTube video IDs for popular songs
-                const videoIds = [
-                    'fJ9rUzIMcZQ',  // Queen - Bohemian Rhapsody
-                    'kJQP7kiw5Fk',  // Luis Fonsi - Despacito
-                    'JGwWNGJdvx8',  // Ed Sheeran - Shape of You
-                    'RgKAFK5djSk',  // Wiz Khalifa - See You Again
-                    '9bZkp7q19f0',  // PSY - Gangnam Style
-                    'hT_nvWreIhg',  // OneRepublic - Counting Stars
-                    'CevxZvSJLk8',  // Katy Perry - Roar
-                    'OPf0YbXqDm0',  // Mark Ronson - Uptown Funk
-                    'YQHsXMglC9A',  // Adele - Hello
-                    'hLQl3WQQoQ0',  // Adele - Someone Like You
-                    '09R8_2nJtjg',  // Maroon 5 - Sugar
-                    'pRpeEdMmmQ0',  // Shakira - Waka Waka
-                    'SlPhMPnQ58k',  // Imagine Dragons - Demons
-                    'ktvTqknDobU',  // Rihanna - Diamonds
-                    'e-ORhEE9VVg',  // Dua Lipa - Levitating
-                ];
-                
-                playerContainer.innerHTML = `
-                    <iframe 
-                        width="100%" 
-                        height="300" 
-                        src="https://www.youtube.com/embed/${videoIds[index]}?autoplay=1" 
-                        frameborder="0" 
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                        allowfullscreen
-                        class="rounded-xl"
-                    ></iframe>
-                `;
+                if (playerModal && playerContainer) {
+                    playerModal.classList.remove('hidden');
+                    playerModal.classList.add('flex');
+                    
+                    const videoIds = [
+                        'fJ9rUzIMcZQ', 'kJQP7kiw5Fk', 'JGwWNGJdvx8', 'RgKAFK5djSk',
+                        '9bZkp7q19f0', 'hT_nvWreIhg', 'CevxZvSJLk8', 'OPf0YbXqDm0',
+                        'YQHsXMglC9A', 'hLQl3WQQoQ0', '09R8_2nJtjg', 'pRpeEdMmmQ0',
+                        'SlPhMPnQ58k', 'ktvTqknDobU', 'e-ORhEE9VVg'
+                    ];
+                    
+                    playerContainer.innerHTML = `
+                        <iframe 
+                            width="100%" 
+                            height="300" 
+                            src="https://www.youtube.com/embed/${videoIds[index]}?autoplay=1" 
+                            frameborder="0" 
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                            allowfullscreen
+                            class="rounded-xl"
+                        ></iframe>
+                    `;
+                }
             },
             
             stopSong() {
@@ -287,15 +266,19 @@
                 
                 const musicBtn = document.getElementById('musicBtn');
                 const musicIcon = document.getElementById('musicIcon');
-                musicBtn.classList.remove('bg-indigo-600');
-                musicBtn.classList.add('bg-white/10');
-                musicIcon.classList.remove('animate-pulse');
+                if (musicBtn) {
+                    musicBtn.classList.remove('bg-indigo-600');
+                    musicBtn.classList.add('bg-white/10');
+                }
+                if (musicIcon) musicIcon.classList.remove('animate-pulse');
                 
                 const playerModal = document.getElementById('youtubePlayerModal');
                 const playerContainer = document.getElementById('youtubePlayerContainer');
-                playerModal.classList.add('hidden');
-                playerModal.classList.remove('flex');
-                playerContainer.innerHTML = '';
+                if (playerModal && playerContainer) {
+                    playerModal.classList.add('hidden');
+                    playerModal.classList.remove('flex');
+                    playerContainer.innerHTML = '';
+                }
             },
             
             setMusicVolume(vol) {
@@ -307,6 +290,8 @@
             }
         };
 
+        // Initialize sound system immediately
+        SoundSystem.init();
         window.SoundSystem = SoundSystem;
 
         const translations = {
@@ -337,15 +322,9 @@
                 disconnected: "Disconnected",
                 points: "Points",
                 rounds: "Rounds",
-                hint: "Send a hint",
                 correctGuess: "Correct Guess",
-                winner: "Winner",
-                gameStats: "Game Stats",
-                onlinePlayers: "Online",
                 musicTitle: "Music Player",
-                volumeLabel: "Volume",
-                stopMusic: "Stop Music",
-                closePlayer: "Close"
+                stopMusic: "Stop Music"
             },
             ar: {
                 title: "كارد<span class='text-cyan-300'>إكس</span> الترا",
@@ -374,21 +353,14 @@
                 disconnected: "غير متصل",
                 points: "النقاط",
                 rounds: "الجولات",
-                hint: "أرسل تلميح",
                 correctGuess: "تخمين صحيح",
-                winner: "الفائز",
-                gameStats: "إحصائيات",
-                onlinePlayers: "متصل",
                 musicTitle: "مشغل الأغاني",
-                volumeLabel: "مستوى الصوت",
-                stopMusic: "إيقاف",
-                closePlayer: "إغلاق"
+                stopMusic: "إيقاف"
             }
         };
 
         let currentLang = 'en';
 
-        // Particle System
         class ParticleSystem {
             constructor(canvas) {
                 this.canvas = canvas;
@@ -466,7 +438,6 @@
             }
         }
 
-        // Confetti System
         function createConfetti() {
             SoundSystem.playVictory();
             const colors = ['#6366f1', '#a855f7', '#ec4899', '#10b981', '#f59e0b', '#3b82f6'];
@@ -495,10 +466,6 @@
             @keyframes confettiFall {
                 0% { transform: translateY(0) rotate(0deg); opacity: 1; }
                 100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
-            }
-            @keyframes pulse-glow {
-                0%, 100% { box-shadow: 0 0 20px rgba(99, 102, 241, 0.5); }
-                50% { box-shadow: 0 0 40px rgba(99, 102, 241, 0.8), 0 0 60px rgba(168, 85, 247, 0.4); }
             }
             @keyframes cardEntrance {
                 from { opacity: 0; transform: translateY(30px) scale(0.9); }
@@ -570,6 +537,7 @@
                 handleVoteModalUI(data);
                 updateStatsUI(data);
             }, (error) => {
+                console.error('Connection error:', error);
                 connectionStatus = 'disconnected';
                 updateConnectionUI();
             });
@@ -599,11 +567,13 @@
 
         window.addEventListener('beforeunload', async () => {
             if (playerRole && playerRole !== 'viewer') {
-                await updateDoc(doc(db, 'games', roomId), { 
-                    [`p${playerRole}`]: "",
-                    [`p${playerRole}Id`]: "",
-                    [`p${playerRole}Reveal`]: false
-                });
+                try {
+                    await updateDoc(doc(db, 'games', roomId), { 
+                        [`p${playerRole}`]: "",
+                        [`p${playerRole}Id`]: "",
+                        [`p${playerRole}Reveal`]: false
+                    });
+                } catch (e) {}
             }
         });
 
@@ -611,6 +581,8 @@
             const t = translations[currentLang];
             for(let i=1; i<=4; i++) {
                 const btn = document.getElementById(`p${i}Btn`);
+                if (!btn) continue;
+                
                 const isOccupied = data[`p${i}Id`] && data[`p${i}Id`] !== currentUser?.uid;
                 const points = data[`p${i}Points`] || 0;
                 
@@ -656,17 +628,21 @@
             if (!name) return;
             localStorage.setItem('cardx_username', name);
             if (playerRole && playerRole !== 'viewer') {
-                await updateDoc(doc(db, 'games', roomId), { [`p${playerRole}Name`]: name });
+                try {
+                    await updateDoc(doc(db, 'games', roomId), { [`p${playerRole}Name`]: name });
+                } catch (e) {}
             }
             const saveBtn = document.querySelector('[onclick="updateStoredName()"]');
-            const originalText = saveBtn.innerText;
-            saveBtn.innerText = currentLang === 'ar' ? "تم الحفظ" : "SAVED";
-            saveBtn.classList.add('bg-emerald-600');
-            SoundSystem.playSuccess();
-            setTimeout(() => {
-                saveBtn.innerText = originalText;
-                saveBtn.classList.remove('bg-emerald-600');
-            }, 2000);
+            if (saveBtn) {
+                const originalText = saveBtn.innerText;
+                saveBtn.innerText = currentLang === 'ar' ? "تم الحفظ" : "SAVED";
+                saveBtn.classList.add('bg-emerald-600');
+                SoundSystem.playSuccess();
+                setTimeout(() => {
+                    saveBtn.innerText = originalText;
+                    saveBtn.classList.remove('bg-emerald-600');
+                }, 2000);
+            }
         };
 
         window.setupPlayer = async (role) => {
@@ -676,10 +652,12 @@
             const userName = document.getElementById('userNameInput').value.trim() || savedName || `Player ${role}`;
             playerRole = role;
             if (role !== 'viewer') {
-                await updateDoc(doc(db, 'games', roomId), { 
-                    [`p${role}Id`]: currentUser.uid,
-                    [`p${role}Name`]: userName
-                });
+                try {
+                    await updateDoc(doc(db, 'games', roomId), { 
+                        [`p${role}Id`]: currentUser.uid,
+                        [`p${role}Name`]: userName
+                    });
+                } catch (e) {}
             }
             document.getElementById('lobbySection').classList.add('hidden');
             document.getElementById('arenaSection').classList.remove('hidden');
@@ -691,11 +669,13 @@
         window.exitToLobby = async () => {
             SoundSystem.playClick();
             if (playerRole && playerRole !== 'viewer') {
-                await updateDoc(doc(db, 'games', roomId), { 
-                    [`p${playerRole}Id`]: "", 
-                    [`p${playerRole}`]: "",
-                    [`p${playerRole}Reveal`]: false
-                });
+                try {
+                    await updateDoc(doc(db, 'games', roomId), { 
+                        [`p${playerRole}Id`]: "", 
+                        [`p${playerRole}`]: "",
+                        [`p${playerRole}Reveal`]: false
+                    });
+                } catch (e) {}
             }
             playerRole = null;
             document.getElementById('arenaSection').classList.add('hidden');
@@ -716,7 +696,9 @@
                     canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
                     const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
                     lastLoadedImage = dataUrl;
-                    await updateDoc(doc(db, 'games', roomId), { [`p${playerRole}`]: dataUrl });
+                    try {
+                        await updateDoc(doc(db, 'games', roomId), { [`p${playerRole}`]: dataUrl });
+                    } catch (e) {}
                     SoundSystem.playSuccess();
                     const btn = document.querySelector('[onclick^="document.getElementById(\'file\')"]');
                     if (btn) {
@@ -733,35 +715,46 @@
             const val = document.getElementById('cardInput').value.trim();
             if (!val) return;
             lastLoadedImage = null;
-            await updateDoc(doc(db, 'games', roomId), { [`p${playerRole}`]: val });
+            try {
+                await updateDoc(doc(db, 'games', roomId), { [`p${playerRole}`]: val });
+            } catch (e) {}
             document.getElementById('cardInput').value = "";
             SoundSystem.playSuccess();
             const saveBtn = document.querySelector('[onclick="saveTextCard()"]');
-            saveBtn.classList.add('bg-emerald-600');
-            setTimeout(() => saveBtn.classList.remove('bg-emerald-600'), 1000);
+            if (saveBtn) {
+                saveBtn.classList.add('bg-emerald-600');
+                setTimeout(() => saveBtn.classList.remove('bg-emerald-600'), 1000);
+            }
         };
 
         window.toggleEmojiPicker = () => {
             SoundSystem.playClick();
             const picker = document.getElementById('emojiPicker');
-            picker.classList.toggle('hidden');
-            picker.classList.toggle('scale-95');
-            picker.classList.toggle('scale-100');
+            if (picker) {
+                picker.classList.toggle('hidden');
+                picker.classList.toggle('scale-95');
+                picker.classList.toggle('scale-100');
+            }
         };
 
         window.addEmoji = (emoji) => {
             SoundSystem.playClick();
             const input = document.getElementById('clueInput');
-            input.value += emoji;
-            input.focus();
+            if (input) {
+                input.value += emoji;
+                input.focus();
+            }
             toggleEmojiPicker();
         };
 
         window.toggleMyReveal = async () => {
             SoundSystem.playCardFlip();
             const snap = await getDoc(doc(db, 'games', roomId));
-            const current = snap.data()[`p${playerRole}Reveal`] || false;
-            await updateDoc(doc(db, 'games', roomId), { [`p${playerRole}Reveal`]: !current });
+            const data = snap.data();
+            const current = data[`p${playerRole}Reveal`] || false;
+            try {
+                await updateDoc(doc(db, 'games', roomId), { [`p${playerRole}Reveal`]: !current });
+            } catch (e) {}
         };
 
         window.handleCardClick = async () => {
@@ -772,118 +765,132 @@
         };
 
         function updateGameArena(data) {
+            if (!data) return;
             const t = translations[currentLang];
+            
             if (playerRole !== 'viewer') {
                 const val = lastLoadedImage || data[`p${playerRole}`];
                 const el = document.getElementById('myCardContent');
                 
-                if (val && val.startsWith('data:image')) {
-                    el.innerHTML = `<img src="${val}" class="w-full h-full object-contain p-2" />`;
-                } else if (val && val.trim() !== "") {
-                    el.innerHTML = `<div class="flex items-center justify-center h-full p-4 text-center">
-                        <span class="text-2xl font-black text-slate-800 break-all uppercase tracking-wide">${val}</span>
-                    </div>`;
-                } else {
-                    el.innerHTML = `
-                        <div class="flex flex-col items-center justify-center h-full p-4 text-center">
-                            <div class="w-16 h-16 rounded-2xl bg-slate-200 flex items-center justify-center mb-3">
-                                <svg class="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-                                </svg>
-                            </div>
-                            <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">${t.emptyCardMsg}</span>
+                if (el) {
+                    if (val && val.startsWith('data:image')) {
+                        el.innerHTML = `<img src="${val}" class="w-full h-full object-contain p-2" />`;
+                    } else if (val && val.trim() !== "") {
+                        el.innerHTML = `<div class="flex items-center justify-center h-full p-4 text-center">
+                            <span class="text-2xl font-black text-slate-800 break-all uppercase tracking-wide">${val}</span>
                         </div>`;
+                    } else {
+                        el.innerHTML = `
+                            <div class="flex flex-col items-center justify-center h-full p-4 text-center">
+                                <div class="w-16 h-16 rounded-2xl bg-slate-200 flex items-center justify-center mb-3">
+                                    <svg class="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                                    </svg>
+                                </div>
+                                <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">${t.emptyCardMsg}</span>
+                            </div>`;
+                    }
                 }
 
                 const isRevealedToPublic = data[`p${playerRole}Reveal`] || false;
                 const revealBtn = document.getElementById('revealToggle');
-                revealBtn.innerText = isRevealedToPublic ? t.hideFromOpponent : t.showToOpponent;
-                revealBtn.className = isRevealedToPublic 
-                    ? "bg-rose-600 text-white text-[10px] px-4 py-2 rounded-xl font-bold uppercase tracking-wider transition-all hover:bg-rose-500"
-                    : "bg-indigo-600 text-white text-[10px] px-4 py-2 rounded-xl font-bold uppercase tracking-wider transition-all hover:bg-indigo-500";
+                if (revealBtn) {
+                    revealBtn.innerText = isRevealedToPublic ? t.hideFromOpponent : t.showToOpponent;
+                    revealBtn.className = isRevealedToPublic 
+                        ? "bg-rose-600 text-white text-[10px] px-4 py-2 rounded-xl font-bold uppercase tracking-wider transition-all hover:bg-rose-500"
+                        : "bg-indigo-600 text-white text-[10px] px-4 py-2 rounded-xl font-bold uppercase tracking-wider transition-all hover:bg-indigo-500";
+                }
                 
                 const flipCard = document.getElementById('myFlipCard');
-                if (data.open || isRevealedToPublic || isLocalPreviewOpen) {
-                    flipCard.classList.add('is-flipped');
-                } else {
-                    flipCard.classList.remove('is-flipped');
+                if (flipCard) {
+                    if (data.open || isRevealedToPublic || isLocalPreviewOpen) {
+                        flipCard.classList.add('is-flipped');
+                    } else {
+                        flipCard.classList.remove('is-flipped');
+                    }
                 }
             }
 
             const grid = document.getElementById('opponentsGrid');
-            grid.innerHTML = '';
-            
-            let opponentCount = 0;
-            for(let i=1; i<=4; i++) {
-                if (i === playerRole || !data[`p${i}Id`]) continue;
-                opponentCount++;
-                const val = data[`p${i}`];
-                const reveal = data[`p${i}Reveal`] || data.open;
-                const isImg = val?.startsWith('data:image');
-                const pName = data[`p${i}Name`] || `Player ${i}`;
-                const pPoints = data[`p${i}Points`] || 0;
+            if (grid) {
+                grid.innerHTML = '';
                 
-                grid.innerHTML += `
-                    <div class="relative group" style="animation: cardEntrance 0.4s ease-out ${opponentCount * 0.1}s both">
-                        <div class="absolute -inset-0.5 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-3xl blur opacity-30 group-hover:opacity-50 transition-opacity"></div>
-                        <div class="relative bg-slate-900/80 backdrop-blur-xl p-5 rounded-3xl flex flex-col items-center border border-white/10">
-                            <div class="mb-3 flex items-center justify-between w-full">
-                                <div class="flex items-center gap-2">
-                                    <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-                                        <span class="text-xs font-black text-white">${i}</span>
+                let opponentCount = 0;
+                for(let i=1; i<=4; i++) {
+                    if (i === playerRole || !data[`p${i}Id`]) continue;
+                    opponentCount++;
+                    const val = data[`p${i}`];
+                    const reveal = data[`p${i}Reveal`] || data.open;
+                    const isImg = val?.startsWith('data:image');
+                    const pName = data[`p${i}Name`] || `Player ${i}`;
+                    const pPoints = data[`p${i}Points`] || 0;
+                    
+                    grid.innerHTML += `
+                        <div class="relative group" style="animation: cardEntrance 0.4s ease-out ${opponentCount * 0.1}s both">
+                            <div class="absolute -inset-0.5 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-3xl blur opacity-30 group-hover:opacity-50 transition-opacity"></div>
+                            <div class="relative bg-slate-900/80 backdrop-blur-xl p-5 rounded-3xl flex flex-col items-center border border-white/10">
+                                <div class="mb-3 flex items-center justify-between w-full">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                                            <span class="text-xs font-black text-white">${i}</span>
+                                        </div>
+                                        <span class="text-sm font-bold text-white">${pName}</span>
                                     </div>
-                                    <span class="text-sm font-bold text-white">${pName}</span>
+                                    <span class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
                                 </div>
-                                <span class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
-                            </div>
-                            
-                            <div class="perspective w-full aspect-[3/4] max-w-[180px] mx-auto">
-                                <div class="card-inner card-glow-hover ${reveal ? 'is-flipped' : ''}" data-revealed="${reveal}">
-                                    <div class="card-face card-front shadow-2xl">
-                                        <div class="absolute inset-0 bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 rounded-2xl"></div>
-                                        <div class="relative flex flex-col items-center justify-center h-full">
-                                            <div class="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center mb-2">
-                                                <svg class="w-6 h-6 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                                </svg>
+                                
+                                <div class="perspective w-full aspect-[3/4] max-w-[180px] mx-auto">
+                                    <div class="card-inner card-glow-hover ${reveal ? 'is-flipped' : ''}">
+                                        <div class="card-face card-front shadow-2xl">
+                                            <div class="absolute inset-0 bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 rounded-2xl"></div>
+                                            <div class="relative flex flex-col items-center justify-center h-full">
+                                                <div class="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center mb-2">
+                                                    <svg class="w-6 h-6 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                                    </svg>
+                                                </div>
+                                                <span class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Hidden</span>
                                             </div>
-                                            <span class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Hidden</span>
+                                        </div>
+                                        <div class="card-face card-back overflow-hidden shadow-2xl border-2 border-indigo-400/50">
+                                            ${reveal && val ? (isImg 
+                                                ? `<img src="${val}" class="w-full h-full object-contain p-2" />` 
+                                                : `<div class="p-3 text-center flex items-center justify-center h-full bg-white"><span class="text-lg font-black text-slate-800 uppercase break-all">${val}</span></div>`) 
+                                                : `<div class="flex items-center justify-center h-full bg-slate-100"><span class="text-slate-400">?</span></div>`}
                                         </div>
                                     </div>
-                                    <div class="card-face card-back overflow-hidden shadow-2xl border-2 border-indigo-400/50">
-                                        ${reveal && val ? (isImg 
-                                            ? `<img src="${val}" class="w-full h-full object-contain p-2" />` 
-                                            : `<div class="p-3 text-center flex items-center justify-center h-full bg-white"><span class="text-lg font-black text-slate-800 uppercase break-all">${val}</span></div>`) 
-                                            : `<div class="flex items-center justify-center h-full bg-slate-100"><span class="text-slate-400">?</span></div>`}
+                                </div>
+                                
+                                ${pPoints > 0 ? `
+                                    <div class="mt-3 px-3 py-1.5 rounded-full bg-amber-500/20 border border-amber-500/30">
+                                        <span class="text-xs font-bold text-amber-400">${pPoints} pts</span>
                                     </div>
-                                </div>
+                                ` : ''}
                             </div>
-                            
-                            ${pPoints > 0 ? `
-                                <div class="mt-3 px-3 py-1.5 rounded-full bg-amber-500/20 border border-amber-500/30">
-                                    <span class="text-xs font-bold text-amber-400">${pPoints} pts</span>
-                                </div>
-                            ` : ''}
                         </div>
-                    </div>
-                `;
+                    `;
+                }
             }
 
             const log = document.getElementById('clueLog');
-            const messages = (data.chat || []).slice(-30).reverse();
-            log.innerHTML = messages.map((m, idx) => `
-                <div class="mb-3 p-4 rounded-2xl ${m.isCorrect 
-                    ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white w-full text-center font-black animate-bounce shadow-lg shadow-emerald-500/30 border border-emerald-400/30' 
-                    : (m.sender === playerRole ? 'bg-indigo-600/30 ml-auto border border-indigo-400/20' : 'bg-white/5 border border-white/5'))} 
-                    max-w-[85%] transition-all duration-300" style="animation: cardEntrance 0.3s ease-out ${idx * 0.05}s both">
-                    <p class="text-[9px] opacity-70 uppercase font-bold mb-1.5 tracking-wider">${m.senderName || 'Anonymous'}</p>
-                    <p class="text-sm font-semibold leading-relaxed">${m.text}</p>
-                    ${m.isCorrect ? `<div class="mt-2 text-xs font-bold uppercase tracking-wider">${t.correctGuess}</div>` : ''}
-                </div>
-            `).join('');
+            if (log) {
+                const messages = (data.chat || []).slice(-30).reverse();
+                log.innerHTML = messages.map((m, idx) => `
+                    <div class="mb-3 p-4 rounded-2xl ${m.isCorrect 
+                        ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white w-full text-center font-black animate-bounce shadow-lg shadow-emerald-500/30 border border-emerald-400/30' 
+                        : (m.sender === playerRole ? 'bg-indigo-600/30 ml-auto border border-indigo-400/20' : 'bg-white/5 border border-white/5'))} 
+                        max-w-[85%] transition-all duration-300" style="animation: cardEntrance 0.3s ease-out ${idx * 0.05}s both">
+                        <p class="text-[9px] opacity-70 uppercase font-bold mb-1.5 tracking-wider">${m.senderName || 'Anonymous'}</p>
+                        <p class="text-sm font-semibold leading-relaxed">${m.text}</p>
+                        ${m.isCorrect ? `<div class="mt-2 text-xs font-bold uppercase tracking-wider">${t.correctGuess}</div>` : ''}
+                    </div>
+                `).join('');
+            }
 
-            document.getElementById('revealBtn').style.display = data.open ? 'none' : 'flex';
-            document.getElementById('resetBtn').style.display = data.open ? 'flex' : 'none';
+            const revealBtn = document.getElementById('revealBtn');
+            const resetBtn = document.getElementById('resetBtn');
+            if (revealBtn) revealBtn.style.display = data.open ? 'none' : 'flex';
+            if (resetBtn) resetBtn.style.display = data.open ? 'flex' : 'none';
         }
 
         window.sendClue = async () => {
@@ -891,6 +898,7 @@
             const input = document.getElementById('clueInput');
             const text = input.value.trim();
             if (!text || playerRole === 'viewer') return;
+            
             const snap = await getDoc(doc(db, 'games', roomId));
             const data = snap.data();
             let isCorrect = false;
@@ -900,23 +908,27 @@
                 if (data[`p${i}`] && !data[`p${i}`].startsWith('data:image') && text.toLowerCase() === data[`p${i}`].toLowerCase()) {
                     isCorrect = true;
                     const currentPoints = data[`p${playerRole}Points`] || 0;
-                    await updateDoc(doc(db, 'games', roomId), {
-                        [`p${playerRole}Points`]: currentPoints + 1
-                    });
+                    try {
+                        await updateDoc(doc(db, 'games', roomId), {
+                            [`p${playerRole}Points`]: currentPoints + 1
+                        });
+                    } catch (e) {}
                     createConfetti();
                 }
             }
             
-            await updateDoc(doc(db, 'games', roomId), {
-                chat: arrayUnion({ 
-                    text, 
-                    sender: playerRole, 
-                    senderName: data[`p${playerRole}Name`] || playerRole, 
-                    isCorrect, 
-                    time: Date.now() 
-                }),
-                open: isCorrect || data.open
-            });
+            try {
+                await updateDoc(doc(db, 'games', roomId), {
+                    chat: arrayUnion({ 
+                        text, 
+                        sender: playerRole, 
+                        senderName: data[`p${playerRole}Name`] || playerRole, 
+                        isCorrect, 
+                        time: Date.now() 
+                    }),
+                    open: isCorrect || data.open
+                });
+            } catch (e) {}
             input.value = '';
         };
 
@@ -925,10 +937,12 @@
             const snap = await getDoc(doc(db, 'games', roomId));
             const data = snap.data();
             if (data.votingActive) return;
-            await updateDoc(doc(db, 'games', roomId), { 
-                votingActive: true, 
-                votes: [currentUser.uid] 
-            });
+            try {
+                await updateDoc(doc(db, 'games', roomId), { 
+                    votingActive: true, 
+                    votes: [currentUser.uid] 
+                });
+            } catch (e) {}
         };
 
         window.castVote = async (approved) => {
@@ -936,7 +950,9 @@
             const snap = await getDoc(doc(db, 'games', roomId));
             const data = snap.data();
             if (!approved) {
-                await updateDoc(doc(db, 'games', roomId), { votingActive: false, votes: [] });
+                try {
+                    await updateDoc(doc(db, 'games', roomId), { votingActive: false, votes: [] });
+                } catch (e) {}
                 return;
             }
             const newVotes = [...new Set([...(data.votes || []), currentUser.uid])];
@@ -945,31 +961,42 @@
             for(let i=1; i<=4; i++) if(data[`p${i}Id`]) activePlayerCount++;
 
             if (newVotes.length >= activePlayerCount) {
-                await updateDoc(doc(db, 'games', roomId), { 
-                    open: true, 
-                    p1Reveal:true, p2Reveal:true, p3Reveal:true, p4Reveal:true,
-                    votingActive: false,
-                    votes: [],
-                    totalRounds: (data.totalRounds || 0) + 1
-                });
+                try {
+                    await updateDoc(doc(db, 'games', roomId), { 
+                        open: true, 
+                        p1Reveal:true, p2Reveal:true, p3Reveal:true, p4Reveal:true,
+                        votingActive: false,
+                        votes: [],
+                        totalRounds: (data.totalRounds || 0) + 1
+                    });
+                } catch (e) {}
                 createConfetti();
             } else {
-                await updateDoc(doc(db, 'games', roomId), { votes: newVotes });
+                try {
+                    await updateDoc(doc(db, 'games', roomId), { votes: newVotes });
+                } catch (e) {}
             }
         };
 
         function handleVoteModalUI(data) {
             const modal = document.getElementById('voteModal');
+            if (!modal) return;
+            
             if (data.votingActive && !data.open) {
                 modal.classList.remove('hidden');
                 modal.classList.add('flex');
                 let activeCount = 0;
                 for(let i=1; i<=4; i++) if(data[`p${i}Id`]) activeCount++;
-                document.getElementById('voteProgressText').innerText = `${(data.votes || []).length} / ${activeCount}`;
+                
+                const progressText = document.getElementById('voteProgressText');
+                if (progressText) progressText.innerText = `${(data.votes || []).length} / ${activeCount}`;
                 
                 const hasVoted = (data.votes || []).includes(currentUser?.uid);
-                document.getElementById('approveVoteBtn').disabled = hasVoted;
-                document.getElementById('approveVoteBtn').classList.toggle('opacity-50', hasVoted);
+                const approveBtn = document.getElementById('approveVoteBtn');
+                if (approveBtn) {
+                    approveBtn.disabled = hasVoted;
+                    approveBtn.classList.toggle('opacity-50', hasVoted);
+                }
             } else {
                 modal.classList.add('hidden');
                 modal.classList.remove('flex');
@@ -984,29 +1011,33 @@
             
             lastLoadedImage = null;
             isLocalPreviewOpen = false;
-            await updateDoc(roomRef, { 
-                p1:"", p2:"", p3:"", p4:"", 
-                chat:[], open:false, 
-                p1Reveal:false, p2Reveal:false, p3Reveal:false, p4Reveal:false,
-                votingActive: false, 
-                votes: [],
-                totalRounds: (data.totalRounds || 0) + 1
-            });
+            try {
+                await updateDoc(roomRef, { 
+                    p1:"", p2:"", p3:"", p4:"", 
+                    chat:[], open:false, 
+                    p1Reveal:false, p2Reveal:false, p3Reveal:false, p4Reveal:false,
+                    votingActive: false, 
+                    votes: [],
+                    totalRounds: (data.totalRounds || 0) + 1
+                });
+            } catch (e) {}
         };
 
         window.fullReset = async () => {
             SoundSystem.playClick();
             if (confirm(currentLang === 'ar' ? 'هل أنت متأكد من إعادة تعيين كل شيء؟' : 'Reset all data?')) {
-                await setDoc(doc(db, 'games', roomId), { 
-                    p1:"", p2:"", p3:"", p4:"", 
-                    p1Id:"", p2Id:"", p3Id:"", p4Id:"",
-                    p1Name:"", p2Name:"", p3Name:"", p4Name:"",
-                    p1Points:0, p2Points:0, p3Points:0, p4Points:0,
-                    p1Reveal:false, p2Reveal:false, p3Reveal:false, p4Reveal:false,
-                    chat:[], open:false, votingActive: false, votes: [],
-                    totalRounds: 0
-                });
-                location.reload();
+                try {
+                    await setDoc(doc(db, 'games', roomId), { 
+                        p1:"", p2:"", p3:"", p4:"", 
+                        p1Id:"", p2Id:"", p3Id:"", p4Id:"",
+                        p1Name:"", p2Name:"", p3Name:"", p4Name:"",
+                        p1Points:0, p2Points:0, p3Points:0, p4Points:0,
+                        p1Reveal:false, p2Reveal:false, p3Reveal:false, p4Reveal:false,
+                        chat:[], open:false, votingActive: false, votes: [],
+                        totalRounds: 0
+                    });
+                    location.reload();
+                } catch (e) {}
             }
         };
 
@@ -1014,6 +1045,8 @@
             const t = translations[currentLang];
             const sendBtn = document.getElementById('sendClueBtn');
             const clueInput = document.getElementById('clueInput');
+            if (!sendBtn || !clueInput) return;
+            
             if (playerRole === 'viewer') {
                 sendBtn.disabled = true;
                 clueInput.disabled = true;
@@ -1025,28 +1058,23 @@
             }
         }
 
-        // Music toggle function
         window.toggleMusic = () => {
             SoundSystem.playClick();
             const panel = document.getElementById('musicPanel');
-            panel.classList.toggle('hidden');
+            if (panel) panel.classList.toggle('hidden');
         };
 
-        // Play song function
         window.playSong = (index) => {
             SoundSystem.playClick();
             SoundSystem.playSong(index);
         };
 
-        // Stop music function
         window.stopMusic = () => {
             SoundSystem.playClick();
             SoundSystem.stopSong();
         };
 
-        // Volume control
         window.setVolume = (type, value) => {
-            SoundSystem.playClick();
             if (type === 'music') {
                 SoundSystem.setMusicVolume(value / 100);
             } else {
@@ -1054,22 +1082,29 @@
             }
         };
 
+        // Auth state listener
         onAuthStateChanged(auth, async (user) => {
             if (user) { 
                 currentUser = user; 
                 initRoomListener();
                 const saved = localStorage.getItem('cardx_username');
-                if(saved) document.getElementById('userNameInput').value = saved;
+                if(saved) {
+                    const input = document.getElementById('userNameInput');
+                    if(input) input.value = saved;
+                }
             } else { 
-                await signInAnonymously(auth); 
+                try {
+                    await signInAnonymously(auth); 
+                } catch (e) {
+                    console.error('Auth error:', e);
+                }
             }
         });
 
+        // Window load
         window.onload = () => {
             const savedTheme = localStorage.getItem('cardx_theme') || 'dark';
             document.body.className = savedTheme + '-theme min-h-screen flex flex-col items-center';
-            
-            SoundSystem.init();
             
             const canvas = document.getElementById('particleCanvas');
             if (canvas) new ParticleSystem(canvas);
@@ -1085,9 +1120,6 @@
             --bg-secondary: #12121a;
             --text-primary: #f1f5f9;
             --text-secondary: #94a3b8;
-            --accent-1: #6366f1;
-            --accent-2: #a855f7;
-            --accent-3: #06b6d4;
         }
 
         body.dark-theme {
@@ -1181,9 +1213,7 @@
             border-radius: 10px; 
         }
 
-        .glow-border {
-            position: relative;
-        }
+        .glow-border { position: relative; }
         .glow-border::before {
             content: '';
             position: absolute;
@@ -1203,9 +1233,6 @@
         .btn-primary:hover {
             transform: translateY(-2px);
             box-shadow: 0 10px 40px -10px rgba(99, 102, 241, 0.5);
-        }
-        .btn-primary:active {
-            transform: translateY(0);
         }
 
         .input-field {
@@ -1243,20 +1270,10 @@
             border-radius: 50%;
             background: #6366f1;
             cursor: pointer;
-            transition: all 0.2s;
         }
 
-        input[type="range"]::-webkit-slider-thumb:hover {
-            transform: scale(1.2);
-            background: #a855f7;
-        }
-
-        .song-item {
-            transition: all 0.2s ease;
-        }
-        .song-item:hover {
-            background: rgba(99, 102, 241, 0.3) !important;
-        }
+        .song-item { transition: all 0.2s ease; }
+        .song-item:hover { background: rgba(99, 102, 241, 0.3) !important; }
 
         @media (max-width: 768px) {
             .logo-text { font-size: 1.5rem; }
@@ -1466,12 +1483,10 @@
                             </div>
                         </div>
                         
-                        <!-- Volume Controls -->
-                        <div class="space-y-3 pt-3 border-t border-white/10">
-                            <div>
-                                <label class="text-[10px] font-bold text-white/60 uppercase tracking-wider block mb-2">Sound Effects Volume</label>
-                                <input type="range" min="0" max="100" value="60" oninput="setVolume('sfx', this.value)" class="w-full">
-                            </div>
+                        <!-- Volume Control -->
+                        <div class="pt-3 border-t border-white/10">
+                            <label class="text-[10px] font-bold text-white/60 uppercase tracking-wider block mb-2">Sound Effects Volume</label>
+                            <input type="range" min="0" max="100" value="60" oninput="setVolume('sfx', this.value)" class="w-full">
                         </div>
                         
                         <!-- Stop Button -->
