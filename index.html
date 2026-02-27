@@ -198,6 +198,14 @@
             animation: pulse-ring 1.5s ease-out infinite;
         }
 
+        .chat-message {
+            transition: all 0.3s ease;
+        }
+        
+        .chat-message:hover {
+            transform: translateX(5px);
+        }
+
         @media (max-width: 768px) {
             .logo-text { font-size: 1.5rem; }
         }
@@ -724,7 +732,11 @@
                 imageCard: "Image",
                 waitingCard: "Waiting...",
                 votePlayer: "Vote to Reveal",
-                votePlayerDesc: "Vote to reveal this player's card"
+                votePlayerDesc: "Vote to reveal this player's card",
+                systemName: "System",
+                voteStarted: "started a vote to reveal",
+                voteRejected: "Vote rejected by a player",
+                voteApproved: "Vote approved! Revealing"
             },
             ar: {
                 title: "كارد<span class='text-cyan-300'>إكس</span> الترا",
@@ -757,11 +769,23 @@
                 imageCard: "صورة",
                 waitingCard: "بانتظار...",
                 votePlayer: "تصويت للكشف",
-                votePlayerDesc: "تصويت لكشف كارت هذا اللاعب"
+                votePlayerDesc: "تصويت لكشف كارت هذا اللاعب",
+                systemName: "النظام",
+                voteStarted: "بدأ تصويت لكشف كارت",
+                voteRejected: "تم رفض التصويت من قبل أحد اللاعبين",
+                voteApproved: "تم الموافقة! جاري كشف كارت"
             }
         };
 
         let currentLang = 'en';
+
+        // Time formatting function
+        function formatTime(timestamp) {
+            const date = new Date(timestamp);
+            const hours = date.getHours().toString().padStart(2, '0');
+            const minutes = date.getMinutes().toString().padStart(2, '0');
+            return hours + ':' + minutes;
+        }
 
         // Songs data
         const songsData = [
@@ -1146,11 +1170,26 @@
         // Player Vote System
         window.startPlayerVote = async function(targetPlayer) {
             SoundSystem.playClick();
+            const snap = await getDoc(doc(db, 'games', roomId));
+            const data = snap.data();
+            const t = translations[currentLang];
+            const voterName = data['p' + playerRole + 'Name'] || 'Player ' + playerRole;
+            const targetName = data['p' + targetPlayer + 'Name'] || 'Player ' + targetPlayer;
+            
             try {
+                // Start vote and send system message
                 await updateDoc(doc(db, 'games', roomId), { 
                     playerVoteActive: true, 
                     playerVoteTarget: targetPlayer,
-                    playerVotes: [currentUser.uid]
+                    playerVotes: [currentUser.uid],
+                    chat: arrayUnion({ 
+                        text: t.voteStarted + ' ' + targetName, 
+                        sender: 'SYSTEM', 
+                        senderName: t.systemName, 
+                        isSystem: true,
+                        isCorrect: false,
+                        time: Date.now() 
+                    })
                 });
             } catch (e) {}
         };
@@ -1159,13 +1198,23 @@
             SoundSystem.playClick();
             const snap = await getDoc(doc(db, 'games', roomId));
             const data = snap.data();
+            const t = translations[currentLang];
+            const targetName = data['p' + data.playerVoteTarget + 'Name'] || 'Player ' + data.playerVoteTarget;
             
             if (!approved) {
                 try {
                     await updateDoc(doc(db, 'games', roomId), { 
                         playerVoteActive: false, 
                         playerVoteTarget: null,
-                        playerVotes: []
+                        playerVotes: [],
+                        chat: arrayUnion({ 
+                            text: t.voteRejected, 
+                            sender: 'SYSTEM', 
+                            senderName: t.systemName, 
+                            isSystem: true,
+                            isCorrect: false,
+                            time: Date.now() 
+                        })
                     });
                 } catch (e) {}
                 return;
@@ -1184,7 +1233,15 @@
                         ['p' + data.playerVoteTarget + 'Reveal']: true,
                         playerVoteActive: false,
                         playerVoteTarget: null,
-                        playerVotes: []
+                        playerVotes: [],
+                        chat: arrayUnion({ 
+                            text: t.voteApproved + ' ' + targetName + '!', 
+                            sender: 'SYSTEM', 
+                            senderName: t.systemName, 
+                            isSystem: true,
+                            isCorrect: false,
+                            time: Date.now() 
+                        })
                     });
                 } catch (e) {}
                 createConfetti();
@@ -1239,7 +1296,6 @@
                 const val = lastLoadedImage || data['p' + playerRole];
                 const el = document.getElementById('myCardContent');
                 
-                // Update status badge for my card
                 const statusEl = document.getElementById('myCardStatus');
                 if (statusEl) {
                     statusEl.innerHTML = getCardStatusBadge(val, t);
@@ -1301,10 +1357,8 @@
                     
                     const pointsHtml = pPoints > 0 ? '<div class="mt-3 px-3 py-1.5 rounded-full bg-amber-500/20 border border-amber-500/30"><span class="text-xs font-bold text-amber-400">' + pPoints + ' pts</span></div>' : '';
                     
-                    // Status badge for opponent
                     const statusBadge = getCardStatusBadge(val, t);
                     
-                    // Vote button
                     const voteBtn = !reveal && playerRole !== 'viewer' ? '<button onclick="startPlayerVote(' + i + ')" class="mt-2 px-3 py-1.5 rounded-lg bg-amber-500/20 border border-amber-500/30 text-xs font-bold text-amber-400 hover:bg-amber-500 hover:text-white transition-all">' + t.votePlayer + '</button>' : '';
                     
                     const opponentHtml = '<div class="relative group" style="animation: cardEntrance 0.4s ease-out ' + (opponentCount * 0.1) + 's both"><div class="absolute -inset-0.5 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-3xl blur opacity-30 group-hover:opacity-50 transition-opacity"></div><div class="relative bg-slate-900/80 backdrop-blur-xl p-5 rounded-3xl flex flex-col items-center border border-white/10"><div class="mb-3 flex items-center justify-between w-full"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center"><span class="text-xs font-black text-white">' + i + '</span></div><span class="text-sm font-bold text-white">' + pName + '</span></div><span class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span></div><div class="mb-3">' + statusBadge + '</div><div class="perspective w-full aspect-[3/4] max-w-[180px] mx-auto"><div class="card-inner card-glow-hover ' + (reveal ? 'is-flipped' : '') + '"><div class="card-face card-front shadow-2xl"><div class="absolute inset-0 bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 rounded-2xl"></div><div class="relative flex flex-col items-center justify-center h-full"><div class="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center mb-2"><svg class="w-6 h-6 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div><span class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Hidden</span></div></div><div class="card-face card-back overflow-hidden shadow-2xl border-2 border-indigo-400/50">' + cardContent + '</div></div></div>' + voteBtn + pointsHtml + '</div></div>';
@@ -1319,14 +1373,22 @@
                 let logHtml = '';
                 messages.forEach(function(m, idx) {
                     const isSender = m.sender === playerRole;
-                    let msgClass = 'bg-white/5 border border-white/5';
-                    if (m.isCorrect) {
-                        msgClass = 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white w-full text-center font-black animate-bounce shadow-lg shadow-emerald-500/30 border border-emerald-400/30';
-                    } else if (isSender) {
-                        msgClass = 'bg-indigo-600/30 ml-auto border border-indigo-400/20';
+                    const timeStr = formatTime(m.time || Date.now());
+                    
+                    if (m.isSystem) {
+                        // System message
+                        logHtml += '<div class="chat-message mb-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 w-full text-center" style="animation: cardEntrance 0.3s ease-out ' + (idx * 0.05) + 's both"><div class="flex items-center justify-center gap-2 mb-1"><span class="text-amber-400 text-sm">⚡</span><span class="text-[10px] font-bold text-amber-400 uppercase tracking-wider">' + m.senderName + '</span><span class="text-[9px] text-amber-400/50">' + timeStr + '</span></div><p class="text-xs text-amber-300 font-semibold">' + m.text + '</p></div>';
+                    } else if (m.isCorrect) {
+                        // Correct guess
+                        logHtml += '<div class="chat-message mb-3 p-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white w-full text-center font-black animate-bounce shadow-lg shadow-emerald-500/30 border border-emerald-400/30" style="animation: cardEntrance 0.3s ease-out ' + (idx * 0.05) + 's both"><div class="flex items-center justify-center gap-2 mb-1"><span class="text-xs">🎉</span><span class="text-[9px] opacity-80 uppercase tracking-wider">' + m.senderName + '</span><span class="text-[9px] opacity-60">' + timeStr + '</span></div><p class="text-sm font-bold leading-relaxed">' + m.text + '</p><div class="mt-2 text-xs font-bold uppercase tracking-wider">' + t.correctGuess + '</div></div>';
+                    } else {
+                        // Normal message
+                        let msgClass = 'bg-white/5 border border-white/5';
+                        if (isSender) {
+                            msgClass = 'bg-indigo-600/30 ml-auto border border-indigo-400/20';
+                        }
+                        logHtml += '<div class="chat-message mb-3 p-3 rounded-2xl ' + msgClass + ' max-w-[85%]" style="animation: cardEntrance 0.3s ease-out ' + (idx * 0.05) + 's both"><div class="flex items-center gap-2 mb-1"><span class="text-[9px] opacity-70 uppercase font-bold tracking-wider">' + m.senderName + '</span><span class="text-[8px] opacity-40">' + timeStr + '</span></div><p class="text-sm font-semibold leading-relaxed">' + m.text + '</p></div>';
                     }
-                    const correctHtml = m.isCorrect ? '<div class="mt-2 text-xs font-bold uppercase tracking-wider">' + t.correctGuess + '</div>' : '';
-                    logHtml += '<div class="mb-3 p-4 rounded-2xl ' + msgClass + ' max-w-[85%] transition-all duration-300" style="animation: cardEntrance 0.3s ease-out ' + (idx * 0.05) + 's both"><p class="text-[9px] opacity-70 uppercase font-bold mb-1.5 tracking-wider">' + (m.senderName || 'Anonymous') + '</p><p class="text-sm font-semibold leading-relaxed">' + m.text + '</p>' + correctHtml + '</div>';
                 });
                 log.innerHTML = logHtml;
             }
@@ -1369,6 +1431,7 @@
                         sender: playerRole, 
                         senderName: data['p' + playerRole + 'Name'] || playerRole, 
                         isCorrect: isCorrect, 
+                        isSystem: false,
                         time: Date.now() 
                     }),
                     open: isCorrect || data.open
