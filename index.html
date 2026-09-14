@@ -621,6 +621,8 @@
         let roomId = null;          // يُحدّد ديناميكيًا عند إنشاء/انضمام غرفة
         let roomListenerUnsub = null;
         let roomsListUnsub = null;
+        let roomDeletedCheckBusy = false; // يمنع تكرار فحص حذف الغرفة عند اختفاء عابر للوثيقة
+        let roomHeartbeatTimer = null;    // مؤقّت نبضات حياة أثناء التواجد داخل غرفة
 
         // ── Cache busting: مسح البيانات القديمة وإعادة التحميل تلقائياً ──
         const GAME_VERSION = 'cardx_v6_rooms_v1';
@@ -1376,14 +1378,37 @@
             if (roomsListUnsub) { try { roomsListUnsub(); } catch (e) {} roomsListUnsub = null; }
 
             const roomRef = doc(db, 'games', roomId);
+
+            // نبضات حياة: حدّث lastActivity كل دقيقة طالما يوجد شخص داخل الغرفة،
+            // حتى لا يمسح منظّف الغرف القديمة غرفة نشطة أثناء جولة هادئة بدون كتابات
+            if (roomHeartbeatTimer) clearInterval(roomHeartbeatTimer);
+            roomHeartbeatTimer = setInterval(function() {
+                if (!roomId) return;
+                updateDoc(doc(db, 'games', roomId), { lastActivity: serverTimestamp() }).catch(function() {});
+            }, 60 * 1000);
+
             roomListenerUnsub = onSnapshot(roomRef, function(docSnap) {
                 connectionStatus = 'connected';
                 updateConnectionUI();
 
                 if (!docSnap.exists()) {
-                    // الغرفة لم تعد موجودة (تم مسحها) — ارجع للّوبي
-                    alert(translations[currentLang].roomDeleted || 'الغرفة لم تعد موجودة');
-                    exitToRoomsLobby(true);
+                    // اختفاء الوثيقة قد يكون عابرًا (سباق إنشاء/حذف أو تحديث مؤقت) —
+                    // تحقق مباشرة من السيرفر مرة أخيرة قبل إعلان حذف الغرفة
+                    if (roomDeletedCheckBusy) return;
+                    roomDeletedCheckBusy = true;
+                    setTimeout(async function() {
+                        roomDeletedCheckBusy = false;
+                        if (!roomId) return; // خرج المستخدم بالفعل
+                        try {
+                            const check = await getDoc(doc(db, 'games', roomId));
+                            if (check.exists()) return; // إنذار كاذب — الغرفة ما زالت موجودة
+                        } catch (e) {}
+                        try {
+                            if (roomListenerUnsub) { roomListenerUnsub(); roomListenerUnsub = null; }
+                        } catch (e) {}
+                        alert(translations[currentLang].roomDeleted || 'الغرفة لم تعد موجودة');
+                        exitToRoomsLobby(true);
+                    }, 1500);
                     return;
                 }
                 const data = docSnap.data();
@@ -2190,30 +2215,53 @@
                 const t = translations[currentLang];
                 const rooms = [];
                 const now = Date.now();
-                const emptyGraceMs = 60 * 1000;     // دقيقة سماح للغرفة الفارغة قبل المسح
+                const emptyGraceMs = 2 * 60 * 1000; // دقيقتان سماح للغرفة الفارغة قبل المسح
                 const staleMs = 60 * 60 * 1000;     // ساعة بدون نشاط = غرفة قديمة تُمسح
                 const toDelete = [];
+                // لا تنفّذ أي حذف بناءً على لقطة من الذاكرة المؤقتة (قد تكون قديمة أو غير مكتملة)
+                const fromCache = !!(snapshot.metadata && snapshot.metadata.fromCache);
 
                 snapshot.forEach(function(docSnap) {
                     const data = docSnap.data() || {};
                     const playerIds = [data.p1Id, data.p2Id, data.p3Id, data.p4Id, data.p5Id].filter(Boolean);
                     const playerCount = playerIds.length;
-                    const lastMs = (data.lastActivity && data.lastActivity.toMillis) ? data.lastActivity.toMillis()
+
+                    const roomInfo = {
+                        id: docSnap.id,
+                        name: data.name || (t.untitledRoom || 'غرفة بدون اسم'),
+                        playerCount: playerCount,
+                        status: data.roundStarted ? 'playing' : 'waiting',
+                        createdAt: data.createdAt,
+                        hostName: data.p1Name || ''
+                    };
+
+                    // ── حماية الغرف الجديدة من الحذف الخاطئ ──
+                    // 1) وثيقة محلية لم تُعتمد على السيرفر بعد: حقول serverTimestamp() تصل null مؤقتًا
+                    //    فتبدو الغرفة "فارغة منذ الأبد" — وهذا كان سبب مسح الغرفة في لحظة إنشائها.
+                    // 2) أي وثيقة بدون طابع وقت محلول: لا يمكن الحكم على قدمها بأمان → لا تُمسح أبدًا.
+                    const isPendingLocalWrite = docSnap.metadata && docSnap.metadata.hasPendingWrites;
+                    const serverLastMs = (data.lastActivity && data.lastActivity.toMillis) ? data.lastActivity.toMillis()
                                 : (data.createdAt && data.createdAt.toMillis) ? data.createdAt.toMillis()
                                 : 0;
+                    const lastMs = serverLastMs || (typeof data.createdAtMs === 'number' ? data.createdAtMs : 0);
 
-                    // غرفة فارغة منذ أكثر من دقيقة → امسحها
+                    if (isPendingLocalWrite || !lastMs) {
+                        rooms.push(roomInfo); // اعرضها فقط دون أي حذف
+                        return;
+                    }
+
+                    // غرفة فارغة منذ أكثر من دقيقتين → امسحها
                     if (playerCount === 0 && (now - lastMs) > emptyGraceMs) {
                         toDelete.push(docSnap.ref);
                         return;
                     }
                     // غرفة لم يحدث بها نشاط منذ ساعة → امسحها
-                    if (lastMs && (now - lastMs) > staleMs) {
+                    if ((now - lastMs) > staleMs) {
                         toDelete.push(docSnap.ref);
                         return;
                     }
-                    // تجاهل الوثائق القديمة بدون حقل `name` (الغرف القديمة قبل النظام الجديد)
-                    if (!data.name && !data.lastActivity) {
+                    // تجاهل الوثائق القديمة بدون حقل `name` (الغرف القديمة قبل النظام الجديد) — بشرط خلوّها من اللاعبين
+                    if (!data.name && !data.lastActivity && playerCount === 0) {
                         toDelete.push(docSnap.ref);
                         return;
                     }
@@ -2228,10 +2276,12 @@
                     });
                 });
 
-                // امسح الوثائق المُحدّدة
-                toDelete.forEach(function(ref) {
-                    deleteDoc(ref).catch(function() {});
-                });
+                // امسح الوثائق المُحدّدة — فقط عندما تكون اللقطة مؤكدة من السيرفر وليس من كاش
+                if (!fromCache) {
+                    toDelete.forEach(function(ref) {
+                        deleteDoc(ref).catch(function() {});
+                    });
+                }
 
                 renderRoomsList(rooms);
             }, function(err) {
@@ -2298,6 +2348,7 @@
                 await setDoc(doc(db, 'games', newRoomId), {
                     name: name,
                     createdAt: serverTimestamp(),
+                    createdAtMs: Date.now(), // طابع رقمي احتياطي يحمي الغرفة الجديدة من الحذف الخاطئ
                     lastActivity: serverTimestamp(),
                     hostId: currentUser.uid,
                     p1:"", p2:"", p3:"", p4:"", p5:"",
@@ -2364,22 +2415,17 @@
                         lastActivity: serverTimestamp()
                     });
 
-                    // تحقّق إن كانت الغرفة أصبحت فارغة — لو نعم، امسحها
-                    const snap = await getDoc(doc(db, 'games', roomId));
-                    if (snap.exists()) {
-                        const d = snap.data() || {};
-                        const remaining = [d.p1Id, d.p2Id, d.p3Id, d.p4Id, d.p5Id].filter(Boolean).length;
-                        if (remaining === 0) {
-                            await deleteDoc(doc(db, 'games', roomId));
-                        }
-                    }
+                    // ملاحظة: لا نمسح الغرفة فور خروج آخر لاعب — فقد يكون لاعب آخر
+                    // في منتصف الانضمام في نفس اللحظة (سباق حذف). منظّف الغرف في اللوبي
+                    // سيتكفل بمسح الغرف الفارغة تلقائيًا بعد مهلة السماح.
                 } catch (e) {
                     console.error('Exit cleanup error:', e);
                 }
             }
 
-            // أغلق مستمع الغرفة
+            // أغلق مستمع الغرفة ونبضات الحياة
             if (roomListenerUnsub) { try { roomListenerUnsub(); } catch (e) {} roomListenerUnsub = null; }
+            if (roomHeartbeatTimer) { clearInterval(roomHeartbeatTimer); roomHeartbeatTimer = null; }
 
             // صفّر الحالة المحلية
             playerRole = null;
