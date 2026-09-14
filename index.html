@@ -387,8 +387,37 @@
             </div>
         </header>
 
-        <div id="lobbySection" class="flex flex-col items-center py-10">
+        <div id="roomsLobbySection" class="flex flex-col items-center py-10">
+            <div class="glass-panel p-6 md:p-10 rounded-3xl w-full max-w-4xl glow-border">
+                <div class="text-center mb-6">
+                    <div class="text-4xl mb-2">🚪</div>
+                    <h2 data-t="roomsTitle" class="text-2xl md:text-3xl font-black text-white mb-1">الغرف المفتوحة</h2>
+                    <p data-t="roomsDesc" class="text-sm opacity-60 font-medium">اختر غرفة للانضمام أو أنشئ غرفة جديدة</p>
+                </div>
+
+                <div class="mb-6">
+                    <div class="flex flex-col sm:flex-row gap-3">
+                        <input id="newRoomNameInput" data-t="roomNamePlaceholder" placeholder="اسم الغرفة..." class="flex-1 input-field p-4 rounded-xl text-center font-bold placeholder-white/40">
+                        <button onclick="createRoom()" data-t="createRoomBtn" class="btn-primary px-8 py-4 rounded-xl font-bold text-sm text-white uppercase tracking-wider whitespace-nowrap">
+                            غرفة جديدة
+                        </button>
+                    </div>
+                </div>
+
+                <div id="roomsList" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+            </div>
+        </div>
+
+        <div id="lobbySection" class="hidden flex-col items-center py-10">
             <div class="glass-panel p-8 md:p-12 rounded-3xl w-full max-w-2xl glow-border">
+                <div class="flex justify-between items-center mb-6">
+                    <button onclick="exitToRoomsLobby()" class="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-all text-xs font-bold">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                        </svg>
+                        <span data-t="exitToRooms">الغرف</span>
+                    </button>
+                </div>
                 <div class="text-center mb-8">
                     <p data-t="setupDesc" class="text-sm opacity-60 font-semibold uppercase tracking-widest">Pick your name and join the arena</p>
                 </div>
@@ -428,12 +457,20 @@
 
         <div id="arenaSection" class="hidden space-y-6">
             <div class="flex justify-between items-center glass-panel p-4 rounded-2xl">
-                <button onclick="exitToLobby()" data-t="exit" class="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600/20 text-rose-400 hover:bg-rose-600 hover:text-white transition-all text-sm font-bold">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
-                    </svg>
-                    Exit
-                </button>
+                <div class="flex items-center gap-2">
+                    <button onclick="exitToLobby()" data-t="exit" class="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600/20 text-rose-400 hover:bg-rose-600 hover:text-white transition-all text-sm font-bold">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                        </svg>
+                        Exit
+                    </button>
+                    <button onclick="exitToRoomsLobby()" data-t="exitToRooms" class="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600/20 text-indigo-300 hover:bg-indigo-600 hover:text-white transition-all text-sm font-bold">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                        </svg>
+                        الغرف
+                    </button>
+                </div>
                 <div class="flex items-center gap-2">
                     <span class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
                     <span data-t="battleActive" class="text-xs font-bold text-emerald-400 uppercase tracking-widest">Live Battle</span>
@@ -467,7 +504,6 @@
                         <button type="button" onclick="setSharedWordLang('en')" id="sharedLangEn" class="px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all">EN</button>
                     </div>
                 </div>
-                <div id="sharedCategoryChips" class="flex flex-wrap gap-1.5 pt-3 border-t border-white/5"></div>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -558,7 +594,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore, doc, onSnapshot, setDoc, updateDoc, arrayUnion, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, onSnapshot, setDoc, updateDoc, arrayUnion, getDoc, collection, query, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
         const firebaseConfig = {
@@ -582,15 +618,16 @@
         let connectionStatus = 'connecting';
         let votingForPlayer = null;
         let playerNotes = {};
-        const roomId = "global_stable_v4_pro"; 
+        let roomId = null;          // يُحدّد ديناميكيًا عند إنشاء/انضمام غرفة
+        let roomListenerUnsub = null;
+        let roomsListUnsub = null;
 
         // ── Cache busting: مسح البيانات القديمة وإعادة التحميل تلقائياً ──
-        const GAME_VERSION = 'cardx_v5_player5';
+        const GAME_VERSION = 'cardx_v6_rooms_v1';
         if (localStorage.getItem('cardx_version') !== GAME_VERSION) {
             const savedUsername = localStorage.getItem('cardx_username');
             const savedTheme    = localStorage.getItem('cardx_theme');
-            const savedNotes    = localStorage.getItem('cardx_notes_' + roomId);
-            const savedLogs     = localStorage.getItem('cardx_logs_' + roomId);
+            const savedRoomId  = localStorage.getItem('cardx_roomId');
             localStorage.clear();
             document.cookie.split(';').forEach(function(c) {
                 document.cookie = c.trim().split('=')[0] +
@@ -598,18 +635,18 @@
             });
             if (savedUsername) localStorage.setItem('cardx_username', savedUsername);
             if (savedTheme)    localStorage.setItem('cardx_theme',    savedTheme);
-            if (savedNotes)    localStorage.setItem('cardx_notes_' + roomId, savedNotes);
-            if (savedLogs)     localStorage.setItem('cardx_logs_' + roomId, savedLogs);
+            if (savedRoomId)   localStorage.setItem('cardx_roomId',  savedRoomId);
             localStorage.setItem('cardx_version', GAME_VERSION);
             location.reload();
         }
 
         // ── ملاحظات اللاعبين: صندوق صغير خاص بك لتدوين ملاحظة أمام كل لاعب حتى لا تنساها ──
-        try { playerNotes = JSON.parse(localStorage.getItem('cardx_notes_' + roomId) || '{}'); } catch (e) { playerNotes = {}; }
+        // ملاحظة: نستخدم 'current' كمفتاح مؤقت لأن roomId قد لا يكون محددًا بعد
+        try { playerNotes = JSON.parse(localStorage.getItem('cardx_notes_current') || '{}'); } catch (e) { playerNotes = {}; }
 
         window.saveNote = function(playerIndex, value) {
             playerNotes[playerIndex] = value;
-            try { localStorage.setItem('cardx_notes_' + roomId, JSON.stringify(playerNotes)); } catch (e) {}
+            try { localStorage.setItem('cardx_notes_current', JSON.stringify(playerNotes)); } catch (e) {}
         };
 
         window.autoResizeNote = function(el) {
@@ -619,12 +656,12 @@
 
         // ── سجل الهينت والراوند لكل لاعب (زر + بجانب الملاحظة) ──
         let playerLogs = {};
-        try { playerLogs = JSON.parse(localStorage.getItem('cardx_logs_' + roomId) || '{}'); } catch (e) { playerLogs = {}; }
+        try { playerLogs = JSON.parse(localStorage.getItem('cardx_logs_current') || '{}'); } catch (e) { playerLogs = {}; }
         let entryUIState = {};   // حالة مؤقتة: هل القائمة/حقل الإدخال مفتوح لكل لاعب
         let lastPlayerNames = {}; // آخر اسم معروف لكل لاعب، يُستخدم عند إعادة رسم الصندوق بمفرده
 
         function savePlayerLogs() {
-            try { localStorage.setItem('cardx_logs_' + roomId, JSON.stringify(playerLogs)); } catch (e) {}
+            try { localStorage.setItem('cardx_logs_current', JSON.stringify(playerLogs)); } catch (e) {}
         }
 
         function escapeNoteHtml(str) {
@@ -742,56 +779,42 @@
             refreshNoteBlock(i);
         };
 
-        // ── بنك الكلمات الجاهز: تصنيفات تقدر تختار منها بدل ما تكتب بنفسك ──
+        // ── بنك التصنيفات: يعرض اسم التصنيف فقط (لا يعرض الكلمات الداخلية) ──
+        // اللاعب يختار تصنيف عشوائي ثم يكتب في كارته كلمة من عنده تنتمي لهذا التصنيف
         const WORD_BANK = {
-            objects: {
-                ar: { label: 'جماد', words: ['قلم', 'ساعة', 'مرآة', 'مظلة', 'نظارة', 'مفتاح', 'شنطة', 'كرسي', 'جريدة', 'كتاب', 'تليفزيون', 'موبايل', 'كاميرا', 'دباسة', 'مقص', 'فرشة أسنان', 'صابون', 'منشفة', 'مروحة', 'سلم'] },
-                en: { label: 'Objects', words: ['Pen', 'Watch', 'Mirror', 'Umbrella', 'Glasses', 'Key', 'Bag', 'Chair', 'Newspaper', 'Book', 'Television', 'Phone', 'Camera', 'Stapler', 'Scissors', 'Toothbrush', 'Soap', 'Towel', 'Fan', 'Ladder'] }
-            },
-            foods: {
-                ar: { label: 'أكلات', words: ['كشري', 'ملوخية', 'محشي', 'فول', 'طعمية', 'كبدة', 'مسقعة', 'بامية', 'فراخ مشوية', 'كفتة', 'بيتزا', 'مكرونة', 'شاورما', 'فطير', 'أرز باللبن', 'كنافة', 'بقلاوة', 'أم علي', 'سلطة', 'شوربة عدس'] },
-                en: { label: 'Foods', words: ['Koshari', 'Molokhia', 'Stuffed Vegetables', 'Fava Beans', 'Falafel', 'Liver', 'Moussaka', 'Okra', 'Grilled Chicken', 'Kofta', 'Pizza', 'Pasta', 'Shawarma', 'Feteer', 'Rice Pudding', 'Kunafa', 'Baklava', 'Om Ali', 'Salad', 'Lentil Soup'] }
-            },
-            drinks: {
-                ar: { label: 'مشروبات', words: ['شاي', 'قهوة', 'عصير مانجة', 'عصير برتقال', 'كركديه', 'سحلب', 'عرقسوس', 'تمر هندي', 'ليمون بالنعناع', 'مياه', 'لبن', 'كاكاو', 'نسكافيه', 'شاي بالنعناع', 'عصير قصب'] },
-                en: { label: 'Drinks', words: ['Tea', 'Coffee', 'Mango Juice', 'Orange Juice', 'Hibiscus Tea', 'Sahlab', 'Licorice Drink', 'Tamarind Drink', 'Mint Lemonade', 'Water', 'Milk', 'Cocoa', 'Instant Coffee', 'Mint Tea', 'Sugarcane Juice'] }
-            },
-            household: {
-                ar: { label: 'حاجات البيت', words: ['تلاجة', 'غسالة', 'بوتاجاز', 'مكنسة', 'مروحة', 'سرير', 'مخدة', 'بطانية', 'ستارة', 'سجادة', 'مرآة', 'تليفزيون', 'كنبة', 'ترابيزة', 'كرسي', 'خزانة', 'مصباح', 'ساعة حائط', 'مفرش'] },
-                en: { label: 'Household', words: ['Fridge', 'Washing Machine', 'Stove', 'Vacuum', 'Fan', 'Bed', 'Pillow', 'Blanket', 'Curtain', 'Carpet', 'Mirror', 'Television', 'Sofa', 'Table', 'Chair', 'Closet', 'Lamp', 'Wall Clock', 'Bedsheet'] }
-            },
-            animals: {
-                ar: { label: 'حيوانات', words: ['قطة', 'كلب', 'حصان', 'جمل', 'أسد', 'نمر', 'فيل', 'زرافة', 'قرد', 'أرنب', 'دجاجة', 'بطة', 'حمار', 'بقرة', 'خروف', 'سمكة', 'عصفور', 'نسر', 'ثعلب', 'دب'] },
-                en: { label: 'Animals', words: ['Cat', 'Dog', 'Horse', 'Camel', 'Lion', 'Tiger', 'Elephant', 'Giraffe', 'Monkey', 'Rabbit', 'Chicken', 'Duck', 'Donkey', 'Cow', 'Sheep', 'Fish', 'Bird', 'Eagle', 'Fox', 'Bear'] }
-            },
-            professions: {
-                ar: { label: 'مهن', words: ['طبيب', 'مهندس', 'مدرس', 'محامي', 'شرطي', 'طيار', 'نجار', 'حداد', 'طباخ', 'ممرضة', 'صيدلي', 'مصور', 'صحفي', 'كهربائي', 'سباك', 'فلاح', 'صياد', 'خباز', 'محاسب', 'موظف'] },
-                en: { label: 'Professions', words: ['Doctor', 'Engineer', 'Teacher', 'Lawyer', 'Police Officer', 'Pilot', 'Carpenter', 'Blacksmith', 'Chef', 'Nurse', 'Pharmacist', 'Photographer', 'Journalist', 'Electrician', 'Plumber', 'Farmer', 'Fisherman', 'Baker', 'Accountant', 'Employee'] }
-            },
-            countries: {
-                ar: { label: 'بلاد', words: ['مصر', 'السعودية', 'الإمارات', 'المغرب', 'تونس', 'الجزائر', 'لبنان', 'الأردن', 'العراق', 'سوريا', 'اليمن', 'السودان', 'فرنسا', 'إيطاليا', 'إسبانيا', 'اليابان', 'الصين', 'أمريكا', 'تركيا', 'ألمانيا'] },
-                en: { label: 'Countries', words: ['Egypt', 'Saudi Arabia', 'UAE', 'Morocco', 'Tunisia', 'Algeria', 'Lebanon', 'Jordan', 'Iraq', 'Syria', 'Yemen', 'Sudan', 'France', 'Italy', 'Spain', 'Japan', 'China', 'USA', 'Turkey', 'Germany'] }
-            },
-            sports: {
-                ar: { label: 'رياضات', words: ['كرة القدم', 'كرة السلة', 'السباحة', 'التنس', 'الجري', 'الملاكمة', 'الكرة الطائرة', 'ركوب الخيل', 'الجودو', 'رفع الأثقال', 'كرة اليد', 'التزلج', 'الغطس', 'الدراجات', 'الكاراتيه'] },
-                en: { label: 'Sports', words: ['Football', 'Basketball', 'Swimming', 'Tennis', 'Running', 'Boxing', 'Volleyball', 'Horse Riding', 'Judo', 'Weightlifting', 'Handball', 'Skiing', 'Diving', 'Cycling', 'Karate'] }
-            },
-            footballers: {
-                ar: { label: 'لاعبين كورة', words: ['ميسي', 'رونالدو', 'نيمار', 'مبابي', 'محمد صلاح', 'هالاند', 'بنزيما', 'مودريتش', 'إبراهيموفيتش', 'رونالدينيو', 'بيليه', 'مارادونا', 'زيدان', 'دي بروين', 'فان دايك', 'إنييستا', 'تشافي', 'ديبالا'] },
-                en: { label: 'Football Players', words: ['Messi', 'Ronaldo', 'Neymar', 'Mbappe', 'Mohamed Salah', 'Haaland', 'Benzema', 'Modric', 'Ibrahimovic', 'Ronaldinho', 'Pele', 'Maradona', 'Zidane', 'De Bruyne', 'Van Dijk', 'Iniesta', 'Xavi', 'Dybala'] }
-            }
+            objects:      { ar: { label: 'جماد' },         en: { label: 'Objects' } },
+            foods:        { ar: { label: 'أكلات' },        en: { label: 'Foods' } },
+            drinks:       { ar: { label: 'مشروبات' },       en: { label: 'Drinks' } },
+            household:    { ar: { label: 'حاجات البيت' },   en: { label: 'Household Items' } },
+            animals:      { ar: { label: 'حيوانات' },       en: { label: 'Animals' } },
+            professions:  { ar: { label: 'مهن' },           en: { label: 'Professions' } },
+            countries:    { ar: { label: 'بلاد' },          en: { label: 'Countries' } },
+            sports:       { ar: { label: 'رياضات' },        en: { label: 'Sports' } },
+            footballers:  { ar: { label: 'لاعبي كرة' },     en: { label: 'Football Players' } },
+            clothes:      { ar: { label: 'ملابس' },         en: { label: 'Clothes' } },
+            fruits:       { ar: { label: 'فواكه' },         en: { label: 'Fruits' } },
+            vegetables:   { ar: { label: 'خضروات' },        en: { label: 'Vegetables' } },
+            colors:       { ar: { label: 'ألوان' },         en: { label: 'Colors' } },
+            cars:         { ar: { label: 'سيارات' },        en: { label: 'Cars' } },
+            movies:       { ar: { label: 'أفلام' },         en: { label: 'Movies' } },
+            celebrities:  { ar: { label: 'مشاهير' },        en: { label: 'Celebrities' } },
+            cities:       { ar: { label: 'مدن' },           en: { label: 'Cities' } },
+            teams:        { ar: { label: 'فرق كرة' },       en: { label: 'Football Teams' } },
+            school:       { ar: { label: 'أدوات مدرسية' },  en: { label: 'School Supplies' } },
+            electronics:  { ar: { label: 'إلكترونيات' },    en: { label: 'Electronics' } },
+            flowers:      { ar: { label: 'زهور' },          en: { label: 'Flowers' } },
+            brands:       { ar: { label: 'علامات تجارية' }, en: { label: 'Brands' } },
+            games:        { ar: { label: 'ألعاب' },         en: { label: 'Games' } }
         };
         let sharedWordLang = 'ar';
         try { sharedWordLang = localStorage.getItem('cardx_sharedlang') || 'ar'; } catch (e) { sharedWordLang = 'ar'; }
-        let sharedWordCategory = 'all';
 
         function updateWordBankToggleLabel() {
             const sharedLabel = document.getElementById('sharedWordLabel');
-            if (sharedLabel) sharedLabel.textContent = currentLang === 'ar' ? 'كلمة اللعب' : 'Game word';
+            if (sharedLabel) sharedLabel.textContent = currentLang === 'ar' ? 'تصنيف اللعب' : 'Game Category';
             const sharedBtnLabel = document.getElementById('sharedWordBtnLabel');
-            if (sharedBtnLabel) sharedBtnLabel.textContent = currentLang === 'ar' ? 'كلمة عشوائية' : 'Random word';
+            if (sharedBtnLabel) sharedBtnLabel.textContent = currentLang === 'ar' ? 'تصنيف عشوائي' : 'Random Category';
             updateSharedLangToggleUI();
-            renderSharedCategoryChips();
         }
 
         function updateSharedLangToggleUI() {
@@ -808,28 +831,6 @@
             sharedWordLang = lang;
             try { localStorage.setItem('cardx_sharedlang', lang); } catch (e) {}
             updateSharedLangToggleUI();
-            renderSharedCategoryChips();
-            SoundSystem.playClick();
-        };
-
-        function renderSharedCategoryChips() {
-            const container = document.getElementById('sharedCategoryChips');
-            if (!container) return;
-            const allLabel = currentLang === 'ar' ? 'الكل' : 'All';
-            const activeClasses = 'bg-indigo-600 text-white border-indigo-500';
-            const inactiveClasses = 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10';
-            let html = '<button type="button" onclick="setSharedWordCategory(\'all\')" class="text-[10px] font-bold px-2.5 py-1.5 rounded-lg border transition-all ' + (sharedWordCategory === 'all' ? activeClasses : inactiveClasses) + '">' + allLabel + '</button>';
-            Object.keys(WORD_BANK).forEach(function(key) {
-                const label = WORD_BANK[key][sharedWordLang].label;
-                const isActive = sharedWordCategory === key;
-                html += '<button type="button" onclick="setSharedWordCategory(\'' + key + '\')" class="text-[10px] font-bold px-2.5 py-1.5 rounded-lg border transition-all ' + (isActive ? activeClasses : inactiveClasses) + '">' + label + '</button>';
-            });
-            container.innerHTML = html;
-        }
-
-        window.setSharedWordCategory = function(key) {
-            sharedWordCategory = key;
-            renderSharedCategoryChips();
             SoundSystem.playClick();
         };
 
@@ -1073,7 +1074,22 @@
                 roundAutoStart: "Round starting automatically...",
                 startGame: "Start",
                 manualStart: "Game started with",
-                players: "players"
+                players: "players",
+                roomsTitle: "Open Rooms",
+                roomsDesc: "Join an open room or create a new one",
+                createRoomBtn: "Create Room",
+                roomNamePlaceholder: "Room name...",
+                joinRoom: "Join",
+                noRooms: "No open rooms",
+                noRoomsDesc: "Create a new room to start playing!",
+                playing: "Playing",
+                waiting: "Waiting",
+                exitToRooms: "Rooms",
+                confirmExitToRooms: "Leave this room and go back to rooms lobby?",
+                roomDeleted: "This room no longer exists",
+                createRoomError: "Could not create the room",
+                untitledRoom: "Untitled Room",
+                defaultRoomName: "Room "
             },
             ar: {
                 title: "كارد<span class='text-cyan-300'>إكس</span> الترا",
@@ -1119,7 +1135,22 @@
                 roundAutoStart: "جاري بدء الجولة تلقائياً...",
                 startGame: "ابدأ",
                 manualStart: "بدأت اللعبة بـ",
-                players: "لاعبين"
+                players: "لاعبين",
+                roomsTitle: "الغرف المفتوحة",
+                roomsDesc: "اختر غرفة للانضمام أو أنشئ غرفة جديدة",
+                createRoomBtn: "غرفة جديدة",
+                roomNamePlaceholder: "اسم الغرفة...",
+                joinRoom: "انضمام",
+                noRooms: "لا توجد غرف مفتوحة",
+                noRoomsDesc: "أنشئ غرفة جديدة ليبدأ اللعب!",
+                playing: "تلعب الآن",
+                waiting: "بانتظار اللاعبين",
+                exitToRooms: "الغرف",
+                confirmExitToRooms: "هل تريد الخروج من الغرفة والعودة للّوبي؟",
+                roomDeleted: "الغرفة لم تعد موجودة",
+                createRoomError: "تعذّر إنشاء الغرفة",
+                untitledRoom: "غرفة بدون اسم",
+                defaultRoomName: "غرفة "
             }
         };
 
@@ -1338,27 +1369,21 @@
         }
 
         const initRoomListener = function() {
+            if (!roomId) return;
+            // أغلق أي مستمع سابق للغرفة
+            if (roomListenerUnsub) { try { roomListenerUnsub(); } catch (e) {} }
+            // أوقف مستمع قائمة الغرف أثناء وجودنا داخل غرفة (لتقليل القراءات)
+            if (roomsListUnsub) { try { roomsListUnsub(); } catch (e) {} roomsListUnsub = null; }
+
             const roomRef = doc(db, 'games', roomId);
-            onSnapshot(roomRef, function(docSnap) {
+            roomListenerUnsub = onSnapshot(roomRef, function(docSnap) {
                 connectionStatus = 'connected';
                 updateConnectionUI();
-                
+
                 if (!docSnap.exists()) {
-                    setDoc(roomRef, { 
-                        p1:"", p2:"", p3:"", p4:"", p5:"",
-                        p1Points:0, p2Points:0, p3Points:0, p4Points:0, p5Points:0,
-                        p1Id:"", p2Id:"", p3Id:"", p4Id:"", p5Id:"",
-                        p1Name:"", p2Name:"", p3Name:"", p4Name:"", p5Name:"",
-                        p1Reveal:false, p2Reveal:false, p3Reveal:false, p4Reveal:false, p5Reveal:false,
-                        chat:[], open:false, votes: [],
-                        totalRounds: 0,
-                        playerVoteActive: false,
-                        playerVoteTarget: null,
-                        playerVotes: [],
-                        roundStarted: false,
-                        sharedWord: "",
-                        usedWords: []
-                    });
+                    // الغرفة لم تعد موجودة (تم مسحها) — ارجع للّوبي
+                    alert(translations[currentLang].roomDeleted || 'الغرفة لم تعد موجودة');
+                    exitToRoomsLobby(true);
                     return;
                 }
                 const data = docSnap.data();
@@ -1400,61 +1425,54 @@
             if (roundsEl) roundsEl.textContent = data.totalRounds || 0;
         }
 
-        // ── صندوق الكلمة العشوائية المشتركة: يظهر لكل اللاعبين ويتحدث لحظيًا للجميع ──
+        // ── صندوق التصنيف المشترك: يظهر لكل اللاعبين ويتحدث لحظيًا للجميع ──
+        // الزرار يختار تصنيف عشوائي من بنك التصنيفات ويعرض اسمه فقط (لا يعرض كلمات)
         function updateSharedWordUI(data) {
             const display = document.getElementById('sharedWordDisplay');
             if (!display) return;
             if (data.sharedWord) {
                 display.textContent = data.sharedWord;
             } else {
-                display.textContent = currentLang === 'ar' ? 'دوس على الزر عشان تبدأ' : 'Press the button to start';
+                display.textContent = currentLang === 'ar' ? 'دوس على الزر عشان يختار تصنيف' : 'Press the button to pick a category';
             }
         }
 
         window.rollSharedWord = async function() {
             SoundSystem.playClick();
+            if (!roomId) return;
             const roomRef = doc(db, 'games', roomId);
             try {
-                const snap = await getDoc(roomRef);
-                const data = snap.data() || {};
-                
-                const allWords = [];
-                if (sharedWordCategory === 'all') {
-                    Object.keys(WORD_BANK).forEach(function(cat) {
-                        WORD_BANK[cat][sharedWordLang].words.forEach(function(w) { allWords.push(w); });
-                    });
-                } else if (WORD_BANK[sharedWordCategory]) {
-                    WORD_BANK[sharedWordCategory][sharedWordLang].words.forEach(function(w) { allWords.push(w); });
-                }
-                
-                let used = data.usedWords || [];
-                let available = allWords.filter(function(w) { return used.indexOf(w) === -1; });
-                if (available.length === 0) {
-                    used = [];
-                    available = allWords;
-                }
-                
-                const word = available[Math.floor(Math.random() * available.length)];
-                used = used.concat([word]);
-                
-                await updateDoc(roomRef, { sharedWord: word, usedWords: used });
-                
+                // اختر تصنيفًا عشوائيًا من بنك التصنيفات
+                const categoryKeys = Object.keys(WORD_BANK);
+                const randomKey = categoryKeys[Math.floor(Math.random() * categoryKeys.length)];
+                const categoryLabel = WORD_BANK[randomKey][sharedWordLang].label;
+
+                await updateDoc(roomRef, {
+                    sharedWord: categoryLabel,
+                    lastActivity: serverTimestamp()
+                });
+
                 const btn = document.getElementById('sharedWordBox');
                 if (btn) {
                     btn.classList.add('random-pop');
                     setTimeout(function() { btn.classList.remove('random-pop'); }, 350);
                 }
-            } catch (e) {}
+            } catch (e) {
+                console.error('Roll category error:', e);
+            }
         };
 
         window.addEventListener('beforeunload', async function() {
-            if (playerRole && playerRole !== 'viewer') {
+            if (playerRole && playerRole !== 'viewer' && roomId) {
                 try {
-                    await updateDoc(doc(db, 'games', roomId), { 
-                        ['p' + playerRole]: "",
+                    await updateDoc(doc(db, 'games', roomId), {
                         ['p' + playerRole + 'Id']: "",
-                        ['p' + playerRole + 'Reveal']: false
+                        ['p' + playerRole]: "",
+                        ['p' + playerRole + 'Reveal']: false,
+                        lastActivity: serverTimestamp()
                     });
+                    // ملاحظة: لا يمكننا التحقق بشكل موثوق إن كانت الغرفة أصبحت فارغة هنا (العملية غير متزامنة قبل الإغلاق)
+                    // مستمع قائمة الغرف سيمسحها تلقائيًا بعد دقيقة من فراغها.
                 } catch (e) {}
             }
         });
@@ -1532,17 +1550,19 @@
 
         window.exitToLobby = async function() {
             SoundSystem.playClick();
-            if (playerRole && playerRole !== 'viewer') {
+            if (playerRole && playerRole !== 'viewer' && roomId) {
                 try {
-                    await updateDoc(doc(db, 'games', roomId), { 
-                        ['p' + playerRole + 'Id']: "", 
+                    await updateDoc(doc(db, 'games', roomId), {
+                        ['p' + playerRole + 'Id']: "",
                         ['p' + playerRole]: "",
-                        ['p' + playerRole + 'Reveal']: false
+                        ['p' + playerRole + 'Reveal']: false,
+                        lastActivity: serverTimestamp()
                     });
                 } catch (e) {}
             }
             playerRole = null;
             lastCardValue = null;
+            isLocalPreviewOpen = false;
             document.getElementById('arenaSection').classList.add('hidden');
             document.getElementById('lobbySection').classList.remove('hidden');
         };
@@ -2099,7 +2119,9 @@
                     playerVoteTarget: null,
                     playerVotes: [],
                     roundStarted: false,
-                    totalRounds: (data.totalRounds || 0) + 1
+                    sharedWord: "",
+                    totalRounds: (data.totalRounds || 0) + 1,
+                    lastActivity: serverTimestamp()
                 });
             } catch (e) {}
         };
@@ -2119,7 +2141,9 @@
                         playerVoteTarget: null,
                         playerVotes: [],
                         roundStarted: false,
-                        totalRounds: 0
+                        sharedWord: "",
+                        totalRounds: 0,
+                        lastActivity: serverTimestamp()
                     });
                     location.reload();
                 } catch (e) {}
@@ -2143,18 +2167,275 @@
             }
         }
 
+        // ──────────────────────────────────────────────────────────────────────────
+        // ─── نظام الغرف: لوبي خارجي لإنشاء/انضمام لغرفة + حذف تلقائي عند الفراغ ──
+        // ──────────────────────────────────────────────────────────────────────────
+
+        // يُستدعى عند بدء الجلسة لعرض قائمة الغرف المفتوحة
+        function showRoomsLobby() {
+            document.getElementById('roomsLobbySection')?.classList.remove('hidden');
+            document.getElementById('lobbySection')?.classList.add('hidden');
+            document.getElementById('arenaSection')?.classList.add('hidden');
+            initRoomsListListener();
+            // إعادة ضبط حالة الاتصال
+            connectionStatus = 'connected';
+            updateConnectionUI();
+        }
+
+        // يستمع لكل وثائق مجموعة `games` لعرض الغرف المفتوحة ومسح الغرف الفارغة/القديمة
+        function initRoomsListListener() {
+            if (roomsListUnsub) { try { roomsListUnsub(); } catch (e) {} }
+            const q = query(collection(db, 'games'));
+            roomsListUnsub = onSnapshot(q, function(snapshot) {
+                const t = translations[currentLang];
+                const rooms = [];
+                const now = Date.now();
+                const emptyGraceMs = 60 * 1000;     // دقيقة سماح للغرفة الفارغة قبل المسح
+                const staleMs = 60 * 60 * 1000;     // ساعة بدون نشاط = غرفة قديمة تُمسح
+                const toDelete = [];
+
+                snapshot.forEach(function(docSnap) {
+                    const data = docSnap.data() || {};
+                    const playerIds = [data.p1Id, data.p2Id, data.p3Id, data.p4Id, data.p5Id].filter(Boolean);
+                    const playerCount = playerIds.length;
+                    const lastMs = (data.lastActivity && data.lastActivity.toMillis) ? data.lastActivity.toMillis()
+                                : (data.createdAt && data.createdAt.toMillis) ? data.createdAt.toMillis()
+                                : 0;
+
+                    // غرفة فارغة منذ أكثر من دقيقة → امسحها
+                    if (playerCount === 0 && (now - lastMs) > emptyGraceMs) {
+                        toDelete.push(docSnap.ref);
+                        return;
+                    }
+                    // غرفة لم يحدث بها نشاط منذ ساعة → امسحها
+                    if (lastMs && (now - lastMs) > staleMs) {
+                        toDelete.push(docSnap.ref);
+                        return;
+                    }
+                    // تجاهل الوثائق القديمة بدون حقل `name` (الغرف القديمة قبل النظام الجديد)
+                    if (!data.name && !data.lastActivity) {
+                        toDelete.push(docSnap.ref);
+                        return;
+                    }
+
+                    rooms.push({
+                        id: docSnap.id,
+                        name: data.name || (t.untitledRoom || 'غرفة بدون اسم'),
+                        playerCount: playerCount,
+                        status: data.roundStarted ? 'playing' : 'waiting',
+                        createdAt: data.createdAt,
+                        hostName: data.p1Name || ''
+                    });
+                });
+
+                // امسح الوثائق المُحدّدة
+                toDelete.forEach(function(ref) {
+                    deleteDoc(ref).catch(function() {});
+                });
+
+                renderRoomsList(rooms);
+            }, function(err) {
+                console.error('Rooms list error:', err);
+            });
+        }
+
+        function renderRoomsList(rooms) {
+            const container = document.getElementById('roomsList');
+            if (!container) return;
+            const t = translations[currentLang];
+
+            if (rooms.length === 0) {
+                container.innerHTML =
+                    '<div class="col-span-full text-center py-16 text-white/50">' +
+                    '<div class="text-5xl mb-3">🚪</div>' +
+                    '<p class="text-lg font-bold mb-1">' + (t.noRooms || 'لا توجد غرف مفتوحة') + '</p>' +
+                    '<p class="text-sm">' + (t.noRoomsDesc || 'أنشئ غرفة جديدة ليبدأ اللعب!') + '</p>' +
+                    '</div>';
+                return;
+            }
+
+            // رتّب: الغرف الأنشط أولًا
+            rooms.sort(function(a, b) {
+                if (a.status !== b.status) return a.status === 'playing' ? 1 : -1;
+                return b.playerCount - a.playerCount;
+            });
+
+            container.innerHTML = rooms.map(function(room) {
+                const dots = Array(5).fill(0).map(function(_, i) {
+                    const filled = i < room.playerCount;
+                    return '<span class="w-2.5 h-2.5 rounded-full ' + (filled ? 'bg-emerald-400' : 'bg-white/15') + '"></span>';
+                }).join('');
+
+                const statusBadge = room.status === 'playing'
+                    ? '<span class="px-2 py-1 rounded-lg bg-rose-500/20 text-rose-300 text-[10px] font-bold uppercase tracking-wider">' + (t.playing || 'تلعب الآن') + '</span>'
+                    : '<span class="px-2 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 text-[10px] font-bold uppercase tracking-wider">' + (t.waiting || 'بانتظار اللاعبين') + '</span>';
+
+                return '<div class="glass-panel p-5 rounded-2xl flex items-center justify-between gap-4 hover:bg-white/5 transition-all border border-white/5">' +
+                    '<div class="flex-1 min-w-0">' +
+                        '<div class="flex items-center gap-2 mb-2">' + statusBadge +
+                            '<span class="text-[10px] text-white/40 font-bold">' + room.playerCount + '/5</span>' +
+                        '</div>' +
+                        '<h3 class="text-lg font-bold text-white truncate">' + room.name + '</h3>' +
+                        '<div class="flex gap-1 mt-2">' + dots + '</div>' +
+                    '</div>' +
+                    '<button onclick="joinRoom(\'' + room.id + '\')" class="shrink-0 px-6 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm font-bold hover:opacity-90 transition-all shadow-lg shadow-indigo-500/30">' +
+                        (t.joinRoom || 'انضمام') +
+                    '</button>' +
+                '</div>';
+            }).join('');
+        }
+
+        // إنشاء غرفة جديدة
+        window.createRoom = async function() {
+            if (!currentUser) return;
+            const nameInput = document.getElementById('newRoomNameInput');
+            const defaultName = (translations[currentLang].defaultRoomName || 'غرفة ') + Math.floor(1000 + Math.random() * 9000);
+            const name = (nameInput && nameInput.value || '').trim() || defaultName;
+
+            const newRoomId = 'room_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
+
+            try {
+                await setDoc(doc(db, 'games', newRoomId), {
+                    name: name,
+                    createdAt: serverTimestamp(),
+                    lastActivity: serverTimestamp(),
+                    hostId: currentUser.uid,
+                    p1:"", p2:"", p3:"", p4:"", p5:"",
+                    p1Points:0, p2Points:0, p3Points:0, p4Points:0, p5Points:0,
+                    p1Id:"", p2Id:"", p3Id:"", p4Id:"", p5Id:"",
+                    p1Name:"", p2Name:"", p3Name:"", p4Name:"", p5Name:"",
+                    p1Reveal:false, p2Reveal:false, p3Reveal:false, p4Reveal:false, p5Reveal:false,
+                    chat:[], open:false, votes: [],
+                    totalRounds: 0,
+                    playerVoteActive: false,
+                    playerVoteTarget: null,
+                    playerVotes: [],
+                    roundStarted: false,
+                    sharedWord: ""
+                });
+                if (nameInput) nameInput.value = '';
+                joinRoom(newRoomId);
+            } catch (e) {
+                console.error('Create room error:', e);
+                alert((translations[currentLang].createRoomError || 'تعذّر إنشاء الغرفة'));
+            }
+        };
+
+        // الانضمام لغرفة موجودة
+        window.joinRoom = function(id) {
+            if (!id) return;
+            roomId = id;
+            try { localStorage.setItem('cardx_roomId', roomId); } catch (e) {}
+
+            // حدّث نشاط الغرفة
+            if (currentUser) {
+                updateDoc(doc(db, 'games', roomId), { lastActivity: serverTimestamp() }).catch(function(){});
+            }
+
+            // أظهر لّوبي الغرفة (اختيار اللاعب)
+            document.getElementById('roomsLobbySection')?.classList.add('hidden');
+            document.getElementById('arenaSection')?.classList.add('hidden');
+            document.getElementById('lobbySection')?.classList.remove('hidden');
+
+            // صفّر حالة اللاعب
+            playerRole = null;
+            lastCardValue = null;
+            isLocalPreviewOpen = false;
+
+            initRoomListener();
+            SoundSystem.playClick();
+        };
+
+        // الخروج من غرفة للعودة إلى لّوبي الغرف (يحذف الغرفة تلقائيًا إذا أصبحت فارغة)
+        window.exitToRoomsLobby = async function(skipConfirm) {
+            if (!skipConfirm && playerRole && playerRole !== 'viewer') {
+                const t = translations[currentLang];
+                if (!confirm(t.confirmExitToRooms || 'هل تريد الخروج من الغرفة؟')) return;
+            }
+            SoundSystem.playClick();
+
+            // أفرغ خانة اللاعب الحالي إن وُجدت
+            if (playerRole && playerRole !== 'viewer' && roomId) {
+                try {
+                    await updateDoc(doc(db, 'games', roomId), {
+                        ['p' + playerRole + 'Id']: "",
+                        ['p' + playerRole]: "",
+                        ['p' + playerRole + 'Reveal']: false,
+                        lastActivity: serverTimestamp()
+                    });
+
+                    // تحقّق إن كانت الغرفة أصبحت فارغة — لو نعم، امسحها
+                    const snap = await getDoc(doc(db, 'games', roomId));
+                    if (snap.exists()) {
+                        const d = snap.data() || {};
+                        const remaining = [d.p1Id, d.p2Id, d.p3Id, d.p4Id, d.p5Id].filter(Boolean).length;
+                        if (remaining === 0) {
+                            await deleteDoc(doc(db, 'games', roomId));
+                        }
+                    }
+                } catch (e) {
+                    console.error('Exit cleanup error:', e);
+                }
+            }
+
+            // أغلق مستمع الغرفة
+            if (roomListenerUnsub) { try { roomListenerUnsub(); } catch (e) {} roomListenerUnsub = null; }
+
+            // صفّر الحالة المحلية
+            playerRole = null;
+            lastCardValue = null;
+            isLocalPreviewOpen = false;
+            roomId = null;
+            try { localStorage.removeItem('cardx_roomId'); } catch (e) {}
+
+            // أعد الواجهة للّوبي الخارجي
+            document.getElementById('arenaSection')?.classList.add('hidden');
+            document.getElementById('lobbySection')?.classList.add('hidden');
+            document.getElementById('roomsLobbySection')?.classList.remove('hidden');
+
+            initRoomsListListener();
+        };
+
+        // ──────────────────────────────────────────────────────────────────────────
+        // ─── نهاية نظام الغرف ─────────────────────────────────────────────────────
+        // ──────────────────────────────────────────────────────────────────────────
+
         onAuthStateChanged(auth, async function(user) {
-            if (user) { 
-                currentUser = user; 
-                initRoomListener();
+            if (user) {
+                currentUser = user;
                 const saved = localStorage.getItem('cardx_username');
                 if (saved) {
                     const input = document.getElementById('userNameInput');
                     if (input) input.value = saved;
                 }
-            } else { 
+
+                // حاول العودة لآخر غرفة كنت فيها إن وُجدت وما زالت مفتوحة
+                const savedRoomId = localStorage.getItem('cardx_roomId');
+                if (savedRoomId) {
+                    try {
+                        const snap = await getDoc(doc(db, 'games', savedRoomId));
+                        if (snap.exists()) {
+                            const d = snap.data() || {};
+                            const remaining = [d.p1Id, d.p2Id, d.p3Id, d.p4Id, d.p5Id].filter(Boolean).length;
+                            if (remaining > 0) {
+                                // الغرفة ما زالت نشطة — ادخلها مباشرة
+                                joinRoom(savedRoomId);
+                                return;
+                            } else {
+                                // غرفة فارغة — امسحها واذهب للّوبي
+                                await deleteDoc(doc(db, 'games', savedRoomId));
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Rejoin room error:', e);
+                    }
+                    try { localStorage.removeItem('cardx_roomId'); } catch (e) {}
+                }
+                // لا توجد غرفة محفوظة — اعرض لّوبي الغرف
+                showRoomsLobby();
+            } else {
                 try {
-                    await signInAnonymously(auth); 
+                    await signInAnonymously(auth);
                 } catch (e) {
                     console.error('Auth error:', e);
                 }
