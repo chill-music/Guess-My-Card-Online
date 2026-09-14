@@ -212,6 +212,14 @@
             border-color: rgba(99, 102, 241, 0.6);
             box-shadow: 0 0 15px -3px rgba(99, 102, 241, 0.4);
         }
+        .random-pop {
+            animation: randomPop 0.35s ease;
+        }
+        @keyframes randomPop {
+            0% { transform: scale(1); box-shadow: 0 0 0 rgba(99, 102, 241, 0); }
+            40% { transform: scale(1.03); box-shadow: 0 0 20px -2px rgba(99, 102, 241, 0.6); }
+            100% { transform: scale(1); box-shadow: 0 0 0 rgba(99, 102, 241, 0); }
+        }
         .song-item { transition: all 0.2s ease; }
         .song-item:hover { background: rgba(99, 102, 241, 0.3) !important; }
 
@@ -463,9 +471,14 @@
                         <input type="file" id="file" class="hidden" accept="image/*" onchange="uploadImage(event)">
                     </div>
 
-                    <button type="button" onclick="toggleWordBank()" id="wordBankToggleBtn" class="w-full mb-4 flex items-center justify-center gap-2 text-[11px] font-bold px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-indigo-300 hover:bg-white/10 hover:border-indigo-400/30 transition-all">
-                        <span>🎲</span><span id="wordBankToggleLabel">اختار كلمة جاهزة</span>
-                    </button>
+                    <div class="flex gap-2 mb-4">
+                        <button type="button" onclick="toggleWordBank()" id="wordBankToggleBtn" class="flex-1 flex items-center justify-center gap-2 text-[11px] font-bold px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-indigo-300 hover:bg-white/10 hover:border-indigo-400/30 transition-all">
+                            <span>📚</span><span id="wordBankToggleLabel">اختار من قائمة</span>
+                        </button>
+                        <button type="button" onclick="pickRandomWord()" id="randomWordBtn" class="flex-1 flex items-center justify-center gap-2 text-[11px] font-bold px-3 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600/20 to-purple-600/20 border border-indigo-400/20 text-indigo-300 hover:from-indigo-600/40 hover:to-purple-600/40 hover:border-indigo-400/40 transition-all">
+                            <span>🎲</span><span id="randomWordLabel">كلمة عشوائية</span>
+                        </button>
+                    </div>
                     <div id="wordBankPanel" class="hidden mb-4 p-3 rounded-xl bg-black/20 border border-white/10">
                         <div id="wordBankCategories" class="flex flex-wrap gap-1.5 mb-2"></div>
                         <div id="wordBankWords" class="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto custom-scroll"></div>
@@ -735,7 +748,8 @@
                 'حيوانات': ['قطة', 'كلب', 'حصان', 'جمل', 'أسد', 'نمر', 'فيل', 'زرافة', 'قرد', 'أرنب', 'دجاجة', 'بطة', 'حمار', 'بقرة', 'خروف', 'سمكة', 'عصفور', 'نسر', 'ثعلب', 'دب'],
                 'مهن': ['طبيب', 'مهندس', 'مدرس', 'محامي', 'شرطي', 'طيار', 'نجار', 'حداد', 'طباخ', 'ممرضة', 'صيدلي', 'مصور', 'صحفي', 'كهربائي', 'سباك', 'فلاح', 'صياد', 'خباز', 'محاسب', 'موظف'],
                 'بلاد': ['مصر', 'السعودية', 'الإمارات', 'المغرب', 'تونس', 'الجزائر', 'لبنان', 'الأردن', 'العراق', 'سوريا', 'اليمن', 'السودان', 'فرنسا', 'إيطاليا', 'إسبانيا', 'اليابان', 'الصين', 'أمريكا', 'تركيا', 'ألمانيا'],
-                'رياضات': ['كرة القدم', 'كرة السلة', 'السباحة', 'التنس', 'الجري', 'الملاكمة', 'الكرة الطائرة', 'ركوب الخيل', 'الجودو', 'رفع الأثقال', 'كرة اليد', 'التزلج', 'الغطس', 'الدراجات', 'الكاراتيه']
+                'رياضات': ['كرة القدم', 'كرة السلة', 'السباحة', 'التنس', 'الجري', 'الملاكمة', 'الكرة الطائرة', 'ركوب الخيل', 'الجودو', 'رفع الأثقال', 'كرة اليد', 'التزلج', 'الغطس', 'الدراجات', 'الكاراتيه'],
+                'لاعبين كورة': ['ميسي', 'رونالدو', 'نيمار', 'مبابي', 'محمد صلاح', 'هالاند', 'بنزيما', 'مودريتش', 'إبراهيموفيتش', 'رونالدينيو', 'بيليه', 'مارادونا', 'زيدان', 'دي بروين', 'فان دايك', 'إنييستا', 'تشافي', 'ديبالا']
             },
             en: {
                 'General': ['Pen', 'Watch', 'Mirror', 'Umbrella', 'Glasses', 'Key', 'Bag', 'Chair', 'Newspaper', 'Book', 'Television', 'Phone', 'Camera', 'Stapler', 'Scissors', 'Toothbrush', 'Soap', 'Towel', 'Fan', 'Ladder'],
@@ -745,14 +759,17 @@
                 'Animals': ['Cat', 'Dog', 'Horse', 'Camel', 'Lion', 'Tiger', 'Elephant', 'Giraffe', 'Monkey', 'Rabbit', 'Chicken', 'Duck', 'Donkey', 'Cow', 'Sheep', 'Fish', 'Bird', 'Eagle', 'Fox', 'Bear'],
                 'Professions': ['Doctor', 'Engineer', 'Teacher', 'Lawyer', 'Police Officer', 'Pilot', 'Carpenter', 'Blacksmith', 'Chef', 'Nurse', 'Pharmacist', 'Photographer', 'Journalist', 'Electrician', 'Plumber', 'Farmer', 'Fisherman', 'Baker', 'Accountant', 'Employee'],
                 'Countries': ['Egypt', 'Saudi Arabia', 'UAE', 'Morocco', 'Tunisia', 'Algeria', 'Lebanon', 'Jordan', 'Iraq', 'Syria', 'Yemen', 'Sudan', 'France', 'Italy', 'Spain', 'Japan', 'China', 'USA', 'Turkey', 'Germany'],
-                'Sports': ['Football', 'Basketball', 'Swimming', 'Tennis', 'Running', 'Boxing', 'Volleyball', 'Horse Riding', 'Judo', 'Weightlifting', 'Handball', 'Skiing', 'Diving', 'Cycling', 'Karate']
+                'Sports': ['Football', 'Basketball', 'Swimming', 'Tennis', 'Running', 'Boxing', 'Volleyball', 'Horse Riding', 'Judo', 'Weightlifting', 'Handball', 'Skiing', 'Diving', 'Cycling', 'Karate'],
+                'Football Players': ['Messi', 'Ronaldo', 'Neymar', 'Mbappe', 'Mohamed Salah', 'Haaland', 'Benzema', 'Modric', 'Ibrahimovic', 'Ronaldinho', 'Pele', 'Maradona', 'Zidane', 'De Bruyne', 'Van Dijk', 'Iniesta', 'Xavi', 'Dybala']
             }
         };
         let activeWordBankCategory = null;
 
         function updateWordBankToggleLabel() {
             const label = document.getElementById('wordBankToggleLabel');
-            if (label) label.textContent = currentLang === 'ar' ? 'اختار كلمة جاهزة' : 'Pick a ready word';
+            if (label) label.textContent = currentLang === 'ar' ? 'اختار من قائمة' : 'Browse categories';
+            const randomLabel = document.getElementById('randomWordLabel');
+            if (randomLabel) randomLabel.textContent = currentLang === 'ar' ? 'كلمة عشوائية' : 'Random word';
         }
 
         window.toggleWordBank = function() {
@@ -802,6 +819,25 @@
             saveTextCard();
             const panel = document.getElementById('wordBankPanel');
             if (panel) panel.classList.add('hidden');
+        };
+
+        window.pickRandomWord = function() {
+            const bank = WORD_BANK[currentLang] || WORD_BANK.ar;
+            const allWords = [];
+            Object.keys(bank).forEach(function(cat) {
+                bank[cat].forEach(function(w) { allWords.push(w); });
+            });
+            if (!allWords.length) return;
+            const word = allWords[Math.floor(Math.random() * allWords.length)];
+            const input = document.getElementById('cardInput');
+            if (input) {
+                input.value = word;
+                input.classList.add('random-pop');
+                setTimeout(function() { input.classList.remove('random-pop'); }, 350);
+            }
+            const panel = document.getElementById('wordBankPanel');
+            if (panel) panel.classList.add('hidden');
+            SoundSystem.playClick();
         };
 
         const SoundSystem = {
