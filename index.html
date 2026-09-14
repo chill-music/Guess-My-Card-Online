@@ -453,6 +453,16 @@
                 </div>
             </div>
 
+            <div id="sharedWordBox" class="glass-panel p-4 rounded-2xl flex items-center justify-between gap-4">
+                <div class="flex-1 text-center sm:text-right">
+                    <div id="sharedWordLabel" class="text-[9px] font-bold uppercase tracking-widest text-slate-500 mb-1">كلمة اللعب</div>
+                    <div id="sharedWordDisplay" class="text-lg sm:text-xl font-black text-white break-words">—</div>
+                </div>
+                <button type="button" onclick="rollSharedWord()" id="sharedWordBtn" class="shrink-0 flex items-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-xs font-bold hover:opacity-90 transition-all">
+                    <span>🎲</span><span id="sharedWordBtnLabel">كلمة عشوائية</span>
+                </button>
+            </div>
+
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 <div id="mySecretBox" class="lg:col-span-4 glass-panel p-6 rounded-3xl order-2 lg:order-1">
                     <div class="flex justify-between items-center mb-6">
@@ -770,6 +780,10 @@
             if (label) label.textContent = currentLang === 'ar' ? 'اختار من قائمة' : 'Browse categories';
             const randomLabel = document.getElementById('randomWordLabel');
             if (randomLabel) randomLabel.textContent = currentLang === 'ar' ? 'كلمة عشوائية' : 'Random word';
+            const sharedLabel = document.getElementById('sharedWordLabel');
+            if (sharedLabel) sharedLabel.textContent = currentLang === 'ar' ? 'كلمة اللعب' : 'Game word';
+            const sharedBtnLabel = document.getElementById('sharedWordBtnLabel');
+            if (sharedBtnLabel) sharedBtnLabel.textContent = currentLang === 'ar' ? 'كلمة عشوائية' : 'Random word';
         }
 
         window.toggleWordBank = function() {
@@ -1362,7 +1376,9 @@
                         playerVoteActive: false,
                         playerVoteTarget: null,
                         playerVotes: [],
-                        roundStarted: false
+                        roundStarted: false,
+                        sharedWord: "",
+                        usedWords: []
                     });
                     return;
                 }
@@ -1375,6 +1391,7 @@
                 handleVoteModalUI(data);
                 handlePlayerVoteModalUI(data);
                 updateStatsUI(data);
+                updateSharedWordUI(data);
             }, function(error) {
                 console.error('Connection error:', error);
                 connectionStatus = 'disconnected';
@@ -1403,6 +1420,50 @@
             const roundsEl = document.getElementById('roundsCount');
             if (roundsEl) roundsEl.textContent = data.totalRounds || 0;
         }
+
+        // ── صندوق الكلمة العشوائية المشتركة: يظهر لكل اللاعبين ويتحدث لحظيًا للجميع ──
+        function updateSharedWordUI(data) {
+            const display = document.getElementById('sharedWordDisplay');
+            if (!display) return;
+            if (data.sharedWord) {
+                display.textContent = data.sharedWord;
+            } else {
+                display.textContent = currentLang === 'ar' ? 'دوس على الزر عشان تبدأ' : 'Press the button to start';
+            }
+        }
+
+        window.rollSharedWord = async function() {
+            SoundSystem.playClick();
+            const roomRef = doc(db, 'games', roomId);
+            try {
+                const snap = await getDoc(roomRef);
+                const data = snap.data() || {};
+                
+                const bank = WORD_BANK[currentLang] || WORD_BANK.ar;
+                const allWords = [];
+                Object.keys(bank).forEach(function(cat) {
+                    bank[cat].forEach(function(w) { allWords.push(w); });
+                });
+                
+                let used = data.usedWords || [];
+                let available = allWords.filter(function(w) { return used.indexOf(w) === -1; });
+                if (available.length === 0) {
+                    used = [];
+                    available = allWords;
+                }
+                
+                const word = available[Math.floor(Math.random() * available.length)];
+                used = used.concat([word]);
+                
+                await updateDoc(roomRef, { sharedWord: word, usedWords: used });
+                
+                const btn = document.getElementById('sharedWordBox');
+                if (btn) {
+                    btn.classList.add('random-pop');
+                    setTimeout(function() { btn.classList.remove('random-pop'); }, 350);
+                }
+            } catch (e) {}
+        };
 
         window.addEventListener('beforeunload', async function() {
             if (playerRole && playerRole !== 'viewer') {
