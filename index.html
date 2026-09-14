@@ -454,13 +454,21 @@
                         </button>
                     </div>
                     
-                    <div class="flex gap-2 mb-6">
+                    <div class="flex gap-2 mb-3">
                         <input id="cardInput" data-t="placeholderCard" class="flex-1 input-field text-sm p-3 rounded-xl font-medium placeholder-white/40">
                         <button onclick="saveTextCard()" data-t="save" class="btn-primary px-4 rounded-xl text-xs font-bold text-white">SAVE</button>
                         <button onclick="document.getElementById('file').click()" class="w-11 h-11 rounded-xl glass-panel flex items-center justify-center hover:bg-white/10 transition-all text-lg">
                             📷
                         </button>
                         <input type="file" id="file" class="hidden" accept="image/*" onchange="uploadImage(event)">
+                    </div>
+
+                    <button type="button" onclick="toggleWordBank()" id="wordBankToggleBtn" class="w-full mb-4 flex items-center justify-center gap-2 text-[11px] font-bold px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-indigo-300 hover:bg-white/10 hover:border-indigo-400/30 transition-all">
+                        <span>🎲</span><span id="wordBankToggleLabel">اختار كلمة جاهزة</span>
+                    </button>
+                    <div id="wordBankPanel" class="hidden mb-4 p-3 rounded-xl bg-black/20 border border-white/10">
+                        <div id="wordBankCategories" class="flex flex-wrap gap-1.5 mb-2"></div>
+                        <div id="wordBankWords" class="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto custom-scroll"></div>
                     </div>
                     
                     <div id="myCardStatus" class="mb-4 flex justify-center"></div>
@@ -715,6 +723,85 @@
             playerLogs[i].splice(idx, 1);
             savePlayerLogs();
             refreshNoteBlock(i);
+        };
+
+        // ── بنك الكلمات الجاهز: تصنيفات تقدر تختار منها بدل ما تكتب بنفسك ──
+        const WORD_BANK = {
+            ar: {
+                'جنرال': ['قلم', 'ساعة', 'مرآة', 'مظلة', 'نظارة', 'مفتاح', 'شنطة', 'كرسي', 'جريدة', 'كتاب', 'تليفزيون', 'موبايل', 'كاميرا', 'دباسة', 'مقص', 'فرشة أسنان', 'صابون', 'منشفة', 'مروحة', 'سلم'],
+                'أكلات': ['كشري', 'ملوخية', 'محشي', 'فول', 'طعمية', 'كبدة', 'مسقعة', 'بامية', 'فراخ مشوية', 'كفتة', 'بيتزا', 'مكرونة', 'شاورما', 'فطير', 'أرز باللبن', 'كنافة', 'بقلاوة', 'أم علي', 'سلطة', 'شوربة عدس'],
+                'مشروبات': ['شاي', 'قهوة', 'عصير مانجة', 'عصير برتقال', 'كركديه', 'سحلب', 'عرقسوس', 'تمر هندي', 'ليمون بالنعناع', 'مياه', 'لبن', 'كاكاو', 'نسكافيه', 'شاي بالنعناع', 'عصير قصب'],
+                'حاجات في البيت': ['تلاجة', 'غسالة', 'بوتاجاز', 'مكنسة', 'مروحة', 'سرير', 'مخدة', 'بطانية', 'ستارة', 'سجادة', 'مرآة', 'تليفزيون', 'كنبة', 'ترابيزة', 'كرسي', 'خزانة', 'مصباح', 'ساعة حائط', 'مفرش'],
+                'حيوانات': ['قطة', 'كلب', 'حصان', 'جمل', 'أسد', 'نمر', 'فيل', 'زرافة', 'قرد', 'أرنب', 'دجاجة', 'بطة', 'حمار', 'بقرة', 'خروف', 'سمكة', 'عصفور', 'نسر', 'ثعلب', 'دب'],
+                'مهن': ['طبيب', 'مهندس', 'مدرس', 'محامي', 'شرطي', 'طيار', 'نجار', 'حداد', 'طباخ', 'ممرضة', 'صيدلي', 'مصور', 'صحفي', 'كهربائي', 'سباك', 'فلاح', 'صياد', 'خباز', 'محاسب', 'موظف'],
+                'بلاد': ['مصر', 'السعودية', 'الإمارات', 'المغرب', 'تونس', 'الجزائر', 'لبنان', 'الأردن', 'العراق', 'سوريا', 'اليمن', 'السودان', 'فرنسا', 'إيطاليا', 'إسبانيا', 'اليابان', 'الصين', 'أمريكا', 'تركيا', 'ألمانيا'],
+                'رياضات': ['كرة القدم', 'كرة السلة', 'السباحة', 'التنس', 'الجري', 'الملاكمة', 'الكرة الطائرة', 'ركوب الخيل', 'الجودو', 'رفع الأثقال', 'كرة اليد', 'التزلج', 'الغطس', 'الدراجات', 'الكاراتيه']
+            },
+            en: {
+                'General': ['Pen', 'Watch', 'Mirror', 'Umbrella', 'Glasses', 'Key', 'Bag', 'Chair', 'Newspaper', 'Book', 'Television', 'Phone', 'Camera', 'Stapler', 'Scissors', 'Toothbrush', 'Soap', 'Towel', 'Fan', 'Ladder'],
+                'Foods': ['Koshari', 'Molokhia', 'Stuffed Vegetables', 'Fava Beans', 'Falafel', 'Liver', 'Moussaka', 'Okra', 'Grilled Chicken', 'Kofta', 'Pizza', 'Pasta', 'Shawarma', 'Feteer', 'Rice Pudding', 'Kunafa', 'Baklava', 'Om Ali', 'Salad', 'Lentil Soup'],
+                'Drinks': ['Tea', 'Coffee', 'Mango Juice', 'Orange Juice', 'Hibiscus Tea', 'Sahlab', 'Licorice Drink', 'Tamarind Drink', 'Mint Lemonade', 'Water', 'Milk', 'Cocoa', 'Instant Coffee', 'Mint Tea', 'Sugarcane Juice'],
+                'Household Items': ['Fridge', 'Washing Machine', 'Stove', 'Vacuum', 'Fan', 'Bed', 'Pillow', 'Blanket', 'Curtain', 'Carpet', 'Mirror', 'Television', 'Sofa', 'Table', 'Chair', 'Closet', 'Lamp', 'Wall Clock', 'Bedsheet'],
+                'Animals': ['Cat', 'Dog', 'Horse', 'Camel', 'Lion', 'Tiger', 'Elephant', 'Giraffe', 'Monkey', 'Rabbit', 'Chicken', 'Duck', 'Donkey', 'Cow', 'Sheep', 'Fish', 'Bird', 'Eagle', 'Fox', 'Bear'],
+                'Professions': ['Doctor', 'Engineer', 'Teacher', 'Lawyer', 'Police Officer', 'Pilot', 'Carpenter', 'Blacksmith', 'Chef', 'Nurse', 'Pharmacist', 'Photographer', 'Journalist', 'Electrician', 'Plumber', 'Farmer', 'Fisherman', 'Baker', 'Accountant', 'Employee'],
+                'Countries': ['Egypt', 'Saudi Arabia', 'UAE', 'Morocco', 'Tunisia', 'Algeria', 'Lebanon', 'Jordan', 'Iraq', 'Syria', 'Yemen', 'Sudan', 'France', 'Italy', 'Spain', 'Japan', 'China', 'USA', 'Turkey', 'Germany'],
+                'Sports': ['Football', 'Basketball', 'Swimming', 'Tennis', 'Running', 'Boxing', 'Volleyball', 'Horse Riding', 'Judo', 'Weightlifting', 'Handball', 'Skiing', 'Diving', 'Cycling', 'Karate']
+            }
+        };
+        let activeWordBankCategory = null;
+
+        function updateWordBankToggleLabel() {
+            const label = document.getElementById('wordBankToggleLabel');
+            if (label) label.textContent = currentLang === 'ar' ? 'اختار كلمة جاهزة' : 'Pick a ready word';
+        }
+
+        window.toggleWordBank = function() {
+            const panel = document.getElementById('wordBankPanel');
+            if (!panel) return;
+            const opening = panel.classList.contains('hidden');
+            panel.classList.toggle('hidden');
+            if (opening) {
+                activeWordBankCategory = null;
+                renderWordBankCategories();
+                document.getElementById('wordBankWords').innerHTML = '';
+            }
+        };
+
+        function renderWordBankCategories() {
+            const container = document.getElementById('wordBankCategories');
+            if (!container) return;
+            const bank = WORD_BANK[currentLang] || WORD_BANK.ar;
+            let html = '';
+            Object.keys(bank).forEach(function(cat) {
+                const isActive = cat === activeWordBankCategory;
+                const activeClasses = isActive
+                    ? 'bg-indigo-600 text-white border-indigo-500'
+                    : 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10';
+                html += '<button type="button" onclick="selectWordCategory(\'' + cat.replace(/'/g, "\\'") + '\')" class="text-[10px] font-bold px-2.5 py-1.5 rounded-lg border transition-all ' + activeClasses + '">' + cat + '</button>';
+            });
+            container.innerHTML = html;
+        }
+
+        window.selectWordCategory = function(cat) {
+            activeWordBankCategory = cat;
+            renderWordBankCategories();
+            const bank = WORD_BANK[currentLang] || WORD_BANK.ar;
+            const words = bank[cat] || [];
+            const wordsContainer = document.getElementById('wordBankWords');
+            if (!wordsContainer) return;
+            let html = '';
+            words.forEach(function(word) {
+                html += '<button type="button" onclick="pickWord(\'' + word.replace(/'/g, "\\'") + '\')" class="text-[10px] font-semibold px-2.5 py-1.5 rounded-lg bg-black/30 border border-white/10 text-slate-200 hover:bg-indigo-600 hover:border-indigo-500 hover:text-white transition-all">' + word + '</button>';
+            });
+            wordsContainer.innerHTML = html;
+        };
+
+        window.pickWord = function(word) {
+            const input = document.getElementById('cardInput');
+            if (input) input.value = word;
+            saveTextCard();
+            const panel = document.getElementById('wordBankPanel');
+            if (panel) panel.classList.add('hidden');
         };
 
         const SoundSystem = {
@@ -1171,6 +1258,7 @@
                 }
             });
             updateSendButtonUI();
+            updateWordBankToggleLabel();
         }
 
         function checkAllPlayersReady(data) {
