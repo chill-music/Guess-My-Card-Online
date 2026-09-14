@@ -201,6 +201,17 @@
             cursor: pointer;
         }
 
+        .note-box {
+            transition: height 0.15s ease;
+            line-height: 1.5;
+        }
+        .note-wrapper {
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .note-wrapper:focus-within {
+            border-color: rgba(99, 102, 241, 0.6);
+            box-shadow: 0 0 15px -3px rgba(99, 102, 241, 0.4);
+        }
         .song-item { transition: all 0.2s ease; }
         .song-item:hover { background: rgba(99, 102, 241, 0.3) !important; }
 
@@ -572,6 +583,11 @@
         window.saveNote = function(playerIndex, value) {
             playerNotes[playerIndex] = value;
             try { localStorage.setItem('cardx_notes_' + roomId, JSON.stringify(playerNotes)); } catch (e) {}
+        };
+
+        window.autoResizeNote = function(el) {
+            el.style.height = 'auto';
+            el.style.height = Math.min(el.scrollHeight, 160) + 'px';
         };
 
         const SoundSystem = {
@@ -1599,13 +1615,18 @@
                     const voteBtn = !reveal && playerRole !== 'viewer' ? '<button onclick="startPlayerVote(' + i + ')" class="mt-2 px-3 py-1.5 rounded-lg bg-amber-500/20 border border-amber-500/30 text-xs font-bold text-amber-400 hover:bg-amber-500 hover:text-white transition-all">' + t.votePlayer + '</button>' : '';
                     
                     const noteVal = (playerNotes[i] || '').replace(/"/g, '&quot;');
-                    const notePlaceholder = currentLang === 'ar' ? 'ملاحظتك عن ' + pName + '...' : 'Your note on ' + pName + '...';
-                    const noteBoxHtml = '<textarea data-note-index="' + i + '" class="mt-3 w-full text-[11px] rounded-lg p-2 bg-black/30 border border-white/10 text-slate-200 placeholder-slate-500 resize-none focus:outline-none focus:border-indigo-400/60" rows="2" placeholder="' + notePlaceholder + '" oninput="saveNote(' + i + ', this.value)">' + noteVal + '</textarea>';
+                    const notePlaceholder = currentLang === 'ar' ? 'اكتب ملاحظتك هنا...' : 'Write your note...';
+                    const noteLabel = currentLang === 'ar' ? 'ملاحظة خاصة' : 'Private note';
+                    const noteBoxHtml = '<div class="note-wrapper mt-3 w-full rounded-xl bg-black/30 border border-white/10 px-3 py-2"><div class="flex items-center gap-1.5 mb-1"><svg class="w-3 h-3 text-indigo-400/80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg><span class="text-[9px] font-bold uppercase tracking-widest text-slate-500">' + noteLabel + '</span></div><textarea data-note-index="' + i + '" class="note-box w-full bg-transparent text-[11px] text-slate-200 placeholder-slate-500 resize-none focus:outline-none custom-scroll" rows="1" placeholder="' + notePlaceholder + '" oninput="saveNote(' + i + ', this.value); autoResizeNote(this)">' + noteVal + '</textarea></div>';
                     
                     const opponentHtml = '<div class="relative group" style="animation: cardEntrance 0.4s ease-out ' + (opponentCount * 0.1) + 's both"><div class="absolute -inset-0.5 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-3xl blur opacity-30 group-hover:opacity-50 transition-opacity"></div><div class="relative bg-slate-900/80 backdrop-blur-xl p-5 rounded-3xl flex flex-col items-center border border-white/10"><div class="mb-3 flex items-center justify-between w-full"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center"><span class="text-xs font-black text-white">' + i + '</span></div><span class="text-sm font-bold text-white">' + pName + '</span></div><span class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span></div><div class="mb-3">' + statusBadge + '</div><div class="perspective w-full aspect-[3/4] max-w-[180px] mx-auto"><div class="card-inner card-glow-hover ' + (reveal ? 'is-flipped' : '') + '"><div class="card-face card-front shadow-2xl"><div class="absolute inset-0 bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 rounded-2xl"></div><div class="relative flex flex-col items-center justify-center h-full"><div class="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center mb-2"><svg class="w-6 h-6 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div><span class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Hidden</span></div></div><div class="card-face card-back overflow-hidden shadow-2xl border-2 border-indigo-400/50">' + cardContent + '</div></div></div>' + voteBtn + pointsHtml + noteBoxHtml + '</div></div>';
                     
                     grid.innerHTML += opponentHtml;
                 }
+
+                grid.querySelectorAll('textarea[data-note-index]').forEach(function(ta) {
+                    autoResizeNote(ta);
+                });
 
                 if (focusedNoteIndex !== null) {
                     const restored = grid.querySelector('textarea[data-note-index="' + focusedNoteIndex + '"]');
