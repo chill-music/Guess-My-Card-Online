@@ -565,6 +565,7 @@
             const savedUsername = localStorage.getItem('cardx_username');
             const savedTheme    = localStorage.getItem('cardx_theme');
             const savedNotes    = localStorage.getItem('cardx_notes_' + roomId);
+            const savedLogs     = localStorage.getItem('cardx_logs_' + roomId);
             localStorage.clear();
             document.cookie.split(';').forEach(function(c) {
                 document.cookie = c.trim().split('=')[0] +
@@ -573,6 +574,7 @@
             if (savedUsername) localStorage.setItem('cardx_username', savedUsername);
             if (savedTheme)    localStorage.setItem('cardx_theme',    savedTheme);
             if (savedNotes)    localStorage.setItem('cardx_notes_' + roomId, savedNotes);
+            if (savedLogs)     localStorage.setItem('cardx_logs_' + roomId, savedLogs);
             localStorage.setItem('cardx_version', GAME_VERSION);
             location.reload();
         }
@@ -588,6 +590,131 @@
         window.autoResizeNote = function(el) {
             el.style.height = 'auto';
             el.style.height = Math.min(el.scrollHeight, 160) + 'px';
+        };
+
+        // ── سجل الهينت والراوند لكل لاعب (زر + بجانب الملاحظة) ──
+        let playerLogs = {};
+        try { playerLogs = JSON.parse(localStorage.getItem('cardx_logs_' + roomId) || '{}'); } catch (e) { playerLogs = {}; }
+        let entryUIState = {};   // حالة مؤقتة: هل القائمة/حقل الإدخال مفتوح لكل لاعب
+        let lastPlayerNames = {}; // آخر اسم معروف لكل لاعب، يُستخدم عند إعادة رسم الصندوق بمفرده
+
+        function savePlayerLogs() {
+            try { localStorage.setItem('cardx_logs_' + roomId, JSON.stringify(playerLogs)); } catch (e) {}
+        }
+
+        function escapeNoteHtml(str) {
+            return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        window.buildNoteBlock = function(i, pName) {
+            const note = playerNotes[i] || '';
+            const noteEsc = escapeNoteHtml(note);
+            const notePlaceholder = currentLang === 'ar' ? 'اكتب ملاحظتك هنا...' : 'Write your note...';
+            const noteLabel = currentLang === 'ar' ? 'ملاحظة خاصة' : 'Private note';
+            const logLabel = currentLang === 'ar' ? 'السجل' : 'Log';
+            const hintLabel = currentLang === 'ar' ? 'هينت' : 'Hint';
+            const roundLabel = currentLang === 'ar' ? 'راوند' : 'Round';
+
+            const st = entryUIState[i] || {};
+            const entries = playerLogs[i] || [];
+
+            let hintCount = 0, roundCount = 0, entriesHtml = '';
+            entries.forEach(function(entry, idx) {
+                let num;
+                if (entry.type === 'hint') { hintCount++; num = hintCount; }
+                else { roundCount++; num = roundCount; }
+                const typeLabel = entry.type === 'hint' ? hintLabel : roundLabel;
+                const badgeColor = entry.type === 'hint'
+                    ? 'bg-cyan-500/15 text-cyan-300 border-cyan-500/25'
+                    : 'bg-purple-500/15 text-purple-300 border-purple-500/25';
+                entriesHtml += '<div class="flex items-start gap-2 group/entry py-1">'
+                    + '<span class="shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-md border ' + badgeColor + '">' + typeLabel + ' ' + num + '</span>'
+                    + '<span class="flex-1 text-[11px] text-slate-300 break-words">' + escapeNoteHtml(entry.text) + '</span>'
+                    + '<button onclick="deletePlayerEntry(' + i + ', ' + idx + ')" class="opacity-0 group-hover/entry:opacity-100 text-slate-500 hover:text-rose-400 text-[10px] transition-opacity">✕</button>'
+                    + '</div>';
+            });
+
+            let controlHtml = '';
+            if (st.open === 'menu') {
+                controlHtml = '<div class="flex gap-1.5 mt-1.5">'
+                    + '<button onclick="startEntryInput(' + i + ', \'hint\')" class="flex-1 text-[10px] font-bold py-1 rounded-lg bg-cyan-500/15 text-cyan-300 border border-cyan-500/25 hover:bg-cyan-500/25 transition-colors">' + hintLabel + '</button>'
+                    + '<button onclick="startEntryInput(' + i + ', \'round\')" class="flex-1 text-[10px] font-bold py-1 rounded-lg bg-purple-500/15 text-purple-300 border border-purple-500/25 hover:bg-purple-500/25 transition-colors">' + roundLabel + '</button>'
+                    + '</div>';
+            } else if (st.open === 'input') {
+                const typeLabel = st.type === 'hint' ? hintLabel : roundLabel;
+                const draftEsc = escapeNoteHtml(st.draft || '');
+                controlHtml = '<div class="flex items-center gap-1.5 mt-1.5">'
+                    + '<input data-entry-input="' + i + '" type="text" value="' + draftEsc + '" placeholder="' + typeLabel + '..." oninput="updateEntryDraft(' + i + ', this.value)" onkeydown="if(event.key===\'Enter\'){confirmEntry(' + i + ')}" class="flex-1 text-[11px] rounded-lg px-2 py-1 bg-black/30 border border-white/10 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-400/60" />'
+                    + '<button onclick="confirmEntry(' + i + ')" class="text-emerald-400 hover:text-emerald-300 text-sm px-1">✓</button>'
+                    + '<button onclick="cancelEntry(' + i + ')" class="text-slate-500 hover:text-rose-400 text-sm px-1">✕</button>'
+                    + '</div>';
+            }
+
+            return '<div id="noteBlock-' + i + '" class="mt-3 w-full rounded-xl bg-black/30 border border-white/10 px-3 py-2 note-wrapper">'
+                + '<div class="flex items-center gap-1.5 mb-1">'
+                + '<svg class="w-3 h-3 text-indigo-400/80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>'
+                + '<span class="text-[9px] font-bold uppercase tracking-widest text-slate-500">' + noteLabel + '</span>'
+                + '</div>'
+                + '<textarea data-note-index="' + i + '" class="note-box w-full bg-transparent text-[11px] text-slate-200 placeholder-slate-500 resize-none focus:outline-none custom-scroll" rows="1" placeholder="' + notePlaceholder + '" oninput="saveNote(' + i + ', this.value); autoResizeNote(this)">' + noteEsc + '</textarea>'
+                + '<div class="flex items-center justify-between mt-2 pt-2 border-t border-white/5">'
+                + '<span class="text-[9px] font-bold uppercase tracking-widest text-slate-500">' + logLabel + '</span>'
+                + '<button onclick="toggleEntryMenu(' + i + ')" class="w-5 h-5 rounded-full bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-500 hover:text-white flex items-center justify-center text-xs font-bold transition-colors leading-none">+</button>'
+                + '</div>'
+                + controlHtml
+                + (entriesHtml ? '<div class="mt-1.5">' + entriesHtml + '</div>' : '')
+                + '</div>';
+        };
+
+        function refreshNoteBlock(i) {
+            const el = document.getElementById('noteBlock-' + i);
+            if (!el) return;
+            const pName = lastPlayerNames[i] || ('Player ' + i);
+            el.outerHTML = buildNoteBlock(i, pName);
+            const ta = document.querySelector('textarea[data-note-index="' + i + '"]');
+            if (ta) autoResizeNote(ta);
+        }
+
+        window.toggleEntryMenu = function(i) {
+            if (!entryUIState[i]) entryUIState[i] = {};
+            entryUIState[i].open = entryUIState[i].open ? null : 'menu';
+            entryUIState[i].type = null;
+            refreshNoteBlock(i);
+        };
+
+        window.startEntryInput = function(i, type) {
+            entryUIState[i] = { open: 'input', type: type, draft: '' };
+            refreshNoteBlock(i);
+            const inputEl = document.querySelector('input[data-entry-input="' + i + '"]');
+            if (inputEl) inputEl.focus();
+        };
+
+        window.updateEntryDraft = function(i, value) {
+            if (!entryUIState[i]) entryUIState[i] = {};
+            entryUIState[i].draft = value;
+        };
+
+        window.cancelEntry = function(i) {
+            entryUIState[i] = { open: null, type: null, draft: '' };
+            refreshNoteBlock(i);
+        };
+
+        window.confirmEntry = function(i) {
+            const st = entryUIState[i];
+            if (!st || !st.type) return;
+            const text = (st.draft || '').trim();
+            if (!text) return;
+            if (!playerLogs[i]) playerLogs[i] = [];
+            playerLogs[i].push({ type: st.type, text: text });
+            savePlayerLogs();
+            entryUIState[i] = { open: null, type: null, draft: '' };
+            refreshNoteBlock(i);
+        };
+
+        window.deletePlayerEntry = function(i, idx) {
+            if (!playerLogs[i]) return;
+            playerLogs[i].splice(idx, 1);
+            savePlayerLogs();
+            refreshNoteBlock(i);
         };
 
         const SoundSystem = {
@@ -1580,10 +1707,14 @@
 
             const grid = document.getElementById('opponentsGrid');
             if (grid) {
-                const focusedNote = document.activeElement && document.activeElement.matches('#opponentsGrid textarea') ? document.activeElement : null;
-                const focusedNoteIndex = focusedNote ? focusedNote.getAttribute('data-note-index') : null;
-                const focusedNoteSelStart = focusedNote ? focusedNote.selectionStart : null;
-                const focusedNoteSelEnd = focusedNote ? focusedNote.selectionEnd : null;
+                const focusedEl = document.activeElement;
+                const isNoteFocus = focusedEl && focusedEl.matches('#opponentsGrid textarea[data-note-index]');
+                const isEntryFocus = focusedEl && focusedEl.matches('#opponentsGrid input[data-entry-input]');
+                const focusedSelector = isNoteFocus
+                    ? 'textarea[data-note-index="' + focusedEl.getAttribute('data-note-index') + '"]'
+                    : (isEntryFocus ? 'input[data-entry-input="' + focusedEl.getAttribute('data-entry-input') + '"]' : null);
+                const focusedSelStart = focusedSelector ? focusedEl.selectionStart : null;
+                const focusedSelEnd = focusedSelector ? focusedEl.selectionEnd : null;
 
                 grid.innerHTML = '';
                 
@@ -1614,10 +1745,8 @@
                     
                     const voteBtn = !reveal && playerRole !== 'viewer' ? '<button onclick="startPlayerVote(' + i + ')" class="mt-2 px-3 py-1.5 rounded-lg bg-amber-500/20 border border-amber-500/30 text-xs font-bold text-amber-400 hover:bg-amber-500 hover:text-white transition-all">' + t.votePlayer + '</button>' : '';
                     
-                    const noteVal = (playerNotes[i] || '').replace(/"/g, '&quot;');
-                    const notePlaceholder = currentLang === 'ar' ? 'اكتب ملاحظتك هنا...' : 'Write your note...';
-                    const noteLabel = currentLang === 'ar' ? 'ملاحظة خاصة' : 'Private note';
-                    const noteBoxHtml = '<div class="note-wrapper mt-3 w-full rounded-xl bg-black/30 border border-white/10 px-3 py-2"><div class="flex items-center gap-1.5 mb-1"><svg class="w-3 h-3 text-indigo-400/80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg><span class="text-[9px] font-bold uppercase tracking-widest text-slate-500">' + noteLabel + '</span></div><textarea data-note-index="' + i + '" class="note-box w-full bg-transparent text-[11px] text-slate-200 placeholder-slate-500 resize-none focus:outline-none custom-scroll" rows="1" placeholder="' + notePlaceholder + '" oninput="saveNote(' + i + ', this.value); autoResizeNote(this)">' + noteVal + '</textarea></div>';
+                    lastPlayerNames[i] = pName;
+                    const noteBoxHtml = buildNoteBlock(i, pName);
                     
                     const opponentHtml = '<div class="relative group" style="animation: cardEntrance 0.4s ease-out ' + (opponentCount * 0.1) + 's both"><div class="absolute -inset-0.5 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-3xl blur opacity-30 group-hover:opacity-50 transition-opacity"></div><div class="relative bg-slate-900/80 backdrop-blur-xl p-5 rounded-3xl flex flex-col items-center border border-white/10"><div class="mb-3 flex items-center justify-between w-full"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center"><span class="text-xs font-black text-white">' + i + '</span></div><span class="text-sm font-bold text-white">' + pName + '</span></div><span class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span></div><div class="mb-3">' + statusBadge + '</div><div class="perspective w-full aspect-[3/4] max-w-[180px] mx-auto"><div class="card-inner card-glow-hover ' + (reveal ? 'is-flipped' : '') + '"><div class="card-face card-front shadow-2xl"><div class="absolute inset-0 bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 rounded-2xl"></div><div class="relative flex flex-col items-center justify-center h-full"><div class="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center mb-2"><svg class="w-6 h-6 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div><span class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Hidden</span></div></div><div class="card-face card-back overflow-hidden shadow-2xl border-2 border-indigo-400/50">' + cardContent + '</div></div></div>' + voteBtn + pointsHtml + noteBoxHtml + '</div></div>';
                     
@@ -1628,11 +1757,11 @@
                     autoResizeNote(ta);
                 });
 
-                if (focusedNoteIndex !== null) {
-                    const restored = grid.querySelector('textarea[data-note-index="' + focusedNoteIndex + '"]');
+                if (focusedSelector) {
+                    const restored = grid.querySelector(focusedSelector);
                     if (restored) {
                         restored.focus();
-                        try { restored.setSelectionRange(focusedNoteSelStart, focusedNoteSelEnd); } catch (e) {}
+                        try { restored.setSelectionRange(focusedSelStart, focusedSelEnd); } catch (e) {}
                     }
                 }
             }
