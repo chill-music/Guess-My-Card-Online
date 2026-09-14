@@ -545,6 +545,7 @@
         let isLocalPreviewOpen = false;
         let connectionStatus = 'connecting';
         let votingForPlayer = null;
+        let playerNotes = {};
         const roomId = "global_stable_v4_pro"; 
 
         // ── Cache busting: مسح البيانات القديمة وإعادة التحميل تلقائياً ──
@@ -552,6 +553,7 @@
         if (localStorage.getItem('cardx_version') !== GAME_VERSION) {
             const savedUsername = localStorage.getItem('cardx_username');
             const savedTheme    = localStorage.getItem('cardx_theme');
+            const savedNotes    = localStorage.getItem('cardx_notes_' + roomId);
             localStorage.clear();
             document.cookie.split(';').forEach(function(c) {
                 document.cookie = c.trim().split('=')[0] +
@@ -559,9 +561,18 @@
             });
             if (savedUsername) localStorage.setItem('cardx_username', savedUsername);
             if (savedTheme)    localStorage.setItem('cardx_theme',    savedTheme);
+            if (savedNotes)    localStorage.setItem('cardx_notes_' + roomId, savedNotes);
             localStorage.setItem('cardx_version', GAME_VERSION);
             location.reload();
         }
+
+        // ── ملاحظات اللاعبين: صندوق صغير خاص بك لتدوين ملاحظة أمام كل لاعب حتى لا تنساها ──
+        try { playerNotes = JSON.parse(localStorage.getItem('cardx_notes_' + roomId) || '{}'); } catch (e) { playerNotes = {}; }
+
+        window.saveNote = function(playerIndex, value) {
+            playerNotes[playerIndex] = value;
+            try { localStorage.setItem('cardx_notes_' + roomId, JSON.stringify(playerNotes)); } catch (e) {}
+        };
 
         const SoundSystem = {
             ctx: null,
@@ -1553,6 +1564,11 @@
 
             const grid = document.getElementById('opponentsGrid');
             if (grid) {
+                const focusedNote = document.activeElement && document.activeElement.matches('#opponentsGrid textarea') ? document.activeElement : null;
+                const focusedNoteIndex = focusedNote ? focusedNote.getAttribute('data-note-index') : null;
+                const focusedNoteSelStart = focusedNote ? focusedNote.selectionStart : null;
+                const focusedNoteSelEnd = focusedNote ? focusedNote.selectionEnd : null;
+
                 grid.innerHTML = '';
                 
                 let opponentCount = 0;
@@ -1582,9 +1598,21 @@
                     
                     const voteBtn = !reveal && playerRole !== 'viewer' ? '<button onclick="startPlayerVote(' + i + ')" class="mt-2 px-3 py-1.5 rounded-lg bg-amber-500/20 border border-amber-500/30 text-xs font-bold text-amber-400 hover:bg-amber-500 hover:text-white transition-all">' + t.votePlayer + '</button>' : '';
                     
-                    const opponentHtml = '<div class="relative group" style="animation: cardEntrance 0.4s ease-out ' + (opponentCount * 0.1) + 's both"><div class="absolute -inset-0.5 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-3xl blur opacity-30 group-hover:opacity-50 transition-opacity"></div><div class="relative bg-slate-900/80 backdrop-blur-xl p-5 rounded-3xl flex flex-col items-center border border-white/10"><div class="mb-3 flex items-center justify-between w-full"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center"><span class="text-xs font-black text-white">' + i + '</span></div><span class="text-sm font-bold text-white">' + pName + '</span></div><span class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span></div><div class="mb-3">' + statusBadge + '</div><div class="perspective w-full aspect-[3/4] max-w-[180px] mx-auto"><div class="card-inner card-glow-hover ' + (reveal ? 'is-flipped' : '') + '"><div class="card-face card-front shadow-2xl"><div class="absolute inset-0 bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 rounded-2xl"></div><div class="relative flex flex-col items-center justify-center h-full"><div class="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center mb-2"><svg class="w-6 h-6 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div><span class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Hidden</span></div></div><div class="card-face card-back overflow-hidden shadow-2xl border-2 border-indigo-400/50">' + cardContent + '</div></div></div>' + voteBtn + pointsHtml + '</div></div>';
+                    const noteVal = (playerNotes[i] || '').replace(/"/g, '&quot;');
+                    const notePlaceholder = currentLang === 'ar' ? 'ملاحظتك عن ' + pName + '...' : 'Your note on ' + pName + '...';
+                    const noteBoxHtml = '<textarea data-note-index="' + i + '" class="mt-3 w-full text-[11px] rounded-lg p-2 bg-black/30 border border-white/10 text-slate-200 placeholder-slate-500 resize-none focus:outline-none focus:border-indigo-400/60" rows="2" placeholder="' + notePlaceholder + '" oninput="saveNote(' + i + ', this.value)">' + noteVal + '</textarea>';
+                    
+                    const opponentHtml = '<div class="relative group" style="animation: cardEntrance 0.4s ease-out ' + (opponentCount * 0.1) + 's both"><div class="absolute -inset-0.5 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-3xl blur opacity-30 group-hover:opacity-50 transition-opacity"></div><div class="relative bg-slate-900/80 backdrop-blur-xl p-5 rounded-3xl flex flex-col items-center border border-white/10"><div class="mb-3 flex items-center justify-between w-full"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center"><span class="text-xs font-black text-white">' + i + '</span></div><span class="text-sm font-bold text-white">' + pName + '</span></div><span class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span></div><div class="mb-3">' + statusBadge + '</div><div class="perspective w-full aspect-[3/4] max-w-[180px] mx-auto"><div class="card-inner card-glow-hover ' + (reveal ? 'is-flipped' : '') + '"><div class="card-face card-front shadow-2xl"><div class="absolute inset-0 bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 rounded-2xl"></div><div class="relative flex flex-col items-center justify-center h-full"><div class="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center mb-2"><svg class="w-6 h-6 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div><span class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Hidden</span></div></div><div class="card-face card-back overflow-hidden shadow-2xl border-2 border-indigo-400/50">' + cardContent + '</div></div></div>' + voteBtn + pointsHtml + noteBoxHtml + '</div></div>';
                     
                     grid.innerHTML += opponentHtml;
+                }
+
+                if (focusedNoteIndex !== null) {
+                    const restored = grid.querySelector('textarea[data-note-index="' + focusedNoteIndex + '"]');
+                    if (restored) {
+                        restored.focus();
+                        try { restored.setSelectionRange(focusedNoteSelStart, focusedNoteSelEnd); } catch (e) {}
+                    }
                 }
             }
 
